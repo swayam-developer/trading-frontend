@@ -39,12 +39,15 @@ export interface RegisterRequest {
 
 export interface UserEntity {
   _id: string;
+  userId?: string;
   email: string;
   name?: string;
   phone_number?: string | null;
   date_of_birth?: string | null;
   gender?: 'male' | 'female' | 'other' | null;
   balance?: number | string;
+  phone_exist?: boolean;
+  login_pin_exist?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

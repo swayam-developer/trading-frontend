@@ -8,7 +8,8 @@ import { RegisterScreen } from '../screens/auth/register/RegisterScreen';
 import { LoginScreen } from '../screens/auth/login/LoginScreen';
 import { SetPinScreen } from '../screens/auth/pin/SetPinScreen';
 import { VerifyPinScreen } from '../screens/auth/pin/VerifyPinScreen';
-import { DashboardScreen } from '../screens/dashboard/DashboardScreen';
+import { MainTabNavigator } from './MainTabNavigator';
+import { StockDetailScreen } from '../screens/stockDetail/StockDetailScreen';
 import { Colors } from '../theme/colors';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -30,7 +31,9 @@ export const RootNavigator: React.FC = () => {
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="SetPin" component={SetPinScreen} />
       <Stack.Screen name="VerifyPin" component={VerifyPinScreen} />
-      <Stack.Screen name="Dashboard" component={DashboardScreen} />
+      <Stack.Screen name="Dashboard" component={MainTabNavigator} />
+      <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+      <Stack.Screen name="StockDetail" component={StockDetailScreen} />
     </Stack.Navigator>
   );
 };

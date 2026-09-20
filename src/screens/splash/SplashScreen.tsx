@@ -7,14 +7,25 @@ import { Colors } from '../../theme/colors';
 import { AuraLogo } from '../../components/common/AuraLogo';
 import { useAuthStore } from '../../store/auth/authStore';
 
+import { storageService } from '../../services/storage/storage.service';
+
 export const SplashScreen: React.FC = () => {
   const navigation = useNavigation<RootNavigationProp<'Splash'>>();
-  const { isAuthenticated, hasPin } = useAuthStore();
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (isAuthenticated) {
-        if (hasPin) {
+    let isCancelled = false;
+
+    const routeUser = async () => {
+      // 1. Give storage a moment to restore session from disk
+      await storageService.getItemAsync('aura_auth_session');
+
+      // 2. Minimum splash screen duration for smooth branded experience
+      await new Promise<void>((resolve) => setTimeout(() => resolve(), 1800));
+      if (isCancelled) return;
+
+      const auth = useAuthStore.getState();
+      if (auth.isAuthenticated) {
+        if (auth.hasPin || auth.hasBiometric) {
           navigation.replace('VerifyPin');
         } else {
           navigation.replace('SetPin');
@@ -22,10 +33,14 @@ export const SplashScreen: React.FC = () => {
       } else {
         navigation.replace('EmailCheck');
       }
-    }, 2200);
+    };
 
-    return () => clearTimeout(timer);
-  }, [isAuthenticated, hasPin, navigation]);
+    routeUser();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [navigation]);
 
   return (
     <View style={styles.container}>

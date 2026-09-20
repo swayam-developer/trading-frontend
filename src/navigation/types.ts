@@ -1,5 +1,14 @@
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RouteProp } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { RouteProp, CompositeNavigationProp } from '@react-navigation/native';
+import { Stock } from '../services/stock/stock.types';
+
+export type MainTabParamList = {
+  Markets: undefined;
+  Portfolio: undefined;
+  Orders: undefined;
+  Profile: undefined;
+};
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -19,6 +28,10 @@ export type RootStackParamList = {
   SetPin: undefined;
   VerifyPin: undefined;
   Dashboard: undefined;
+  MainTabs: undefined;
+  StockDetail: {
+    stock: Stock;
+  };
 };
 
 export type RootNavigationProp<T extends keyof RootStackParamList> =
@@ -26,5 +39,16 @@ export type RootNavigationProp<T extends keyof RootStackParamList> =
 
 export type RootRouteProp<T extends keyof RootStackParamList> = RouteProp<
   RootStackParamList,
+  T
+>;
+
+export type MainTabNavigationProp<T extends keyof MainTabParamList> =
+  CompositeNavigationProp<
+    BottomTabNavigationProp<MainTabParamList, T>,
+    NativeStackNavigationProp<RootStackParamList>
+  >;
+
+export type MainTabRouteProp<T extends keyof MainTabParamList> = RouteProp<
+  MainTabParamList,
   T
 >;

@@ -4,6 +4,7 @@ export interface ProfileResponse {
   phone_exist: boolean;
   name: string;
   login_pin_exist: boolean;
+  biometric_exist?: boolean;
   balance: string;
 }
 

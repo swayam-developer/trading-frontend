@@ -2,8 +2,9 @@ import { create } from 'zustand';
 import { AuthState } from './authStore.types';
 import { authApi } from '../../services/auth/auth.api';
 import { userApi } from '../../services/user/user.api';
-import { setAuthTokens } from '../../services/apiClient';
+import { setAuthTokens, setSocketTokens } from '../../services/apiClient';
 import { biometricsService } from '../../services/biometrics/biometrics.service';
+import { storageService, StoredSession } from '../../services/storage/storage.service';
 
 const extractErrorMessage = (error: unknown): string => {
   if (error && typeof error === 'object') {
@@ -13,6 +14,21 @@ const extractErrorMessage = (error: unknown): string => {
     if (err.message) return err.message;
   }
   return 'An unexpected error occurred. Please try again.';
+};
+
+const persistSession = (data?: Partial<StoredSession>) => {
+  const state = useAuthStore.getState();
+  const tokens = data?.tokens || state.tokens;
+  if (!tokens?.access_token) return;
+
+  const session: StoredSession = {
+    user: data?.user !== undefined ? data.user : state.user,
+    profile: data?.profile !== undefined ? data.profile : state.profile,
+    tokens,
+    hasPin: data?.hasPin !== undefined ? data.hasPin : state.hasPin,
+    hasBiometric: data?.hasBiometric !== undefined ? data.hasBiometric : state.hasBiometric,
+  };
+  storageService.setItem('aura_auth_session', JSON.stringify(session));
 };
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -25,6 +41,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   pendingEmail: null,
   registerToken: null,
   hasPin: false,
+  hasBiometric: false,
   isBiometricsAvailable: false,
   biometryType: null,
   isBiometricEnrolled: false,
@@ -102,6 +119,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         tokens: tokens || null,
         isAuthenticated: true,
       });
+      persistSession({ user: res.user, tokens: tokens || undefined });
 
       // Fetch profile to verify if PIN exists
       await get().fetchProfile();
@@ -134,7 +152,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         user: res.user,
         tokens: tokens || null,
         isAuthenticated: true,
+        hasPin: !!res.user?.login_pin_exist,
       });
+      persistSession({ user: res.user, tokens: tokens || undefined, hasPin: !!res.user?.login_pin_exist });
 
       await get().fetchProfile();
     } catch (err) {
@@ -159,6 +179,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         tokens: tokens || null,
         isAuthenticated: true,
       });
+      persistSession({ user: res.user, tokens: tokens || undefined });
 
       await get().fetchProfile();
     } catch (err) {
@@ -171,10 +192,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   fetchProfile: async () => {
     try {
       const profile = await userApi.getProfile();
+      const currentHasPin = get().hasPin;
+      const keysExist = await biometricsService.checkKeysExist();
+      const hasPin = profile.login_pin_exist !== undefined ? profile.login_pin_exist : (currentHasPin || false);
+      const hasBiometric = !!profile.biometric_exist;
+
       set({
         profile,
-        hasPin: profile.login_pin_exist,
+        hasPin,
+        hasBiometric,
+        isBiometricEnrolled: hasBiometric && keysExist,
       });
+      persistSession({ profile, hasPin, hasBiometric });
       return profile;
     } catch {
       return null;
@@ -185,13 +214,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const res = await userApi.setPin({ login_pin: pin });
+      if (res.socket_tokens) {
+        setSocketTokens(res.socket_tokens.socket_access_token, res.socket_tokens.socket_refresh_token);
+      }
       set({
         isLoading: false,
         hasPin: true,
         socketTokens: res.socket_tokens || null,
       });
+      persistSession({ hasPin: true });
     } catch (err) {
       const msg = extractErrorMessage(err);
+      if (msg.toLowerCase().includes('already set')) {
+        set({ isLoading: false, hasPin: true });
+        return;
+      }
       set({ isLoading: false, error: msg });
       throw new Error(msg);
     }
@@ -201,6 +238,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const res = await userApi.verifyPin({ login_pin: pin });
+      if (res.socket_tokens) {
+        setSocketTokens(res.socket_tokens.socket_access_token, res.socket_tokens.socket_refresh_token);
+      }
       set({
         isLoading: false,
         socketTokens: res.socket_tokens || null,
@@ -215,7 +255,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   checkBiometrics: async () => {
     const { available, biometryType } = await biometricsService.checkAvailability();
-    const enrolled = available ? await biometricsService.checkKeysExist() : false;
+    const keysExist = available ? await biometricsService.checkKeysExist() : false;
+    const { hasBiometric } = get();
+    const enrolled = hasBiometric && keysExist;
     set({
       isBiometricsAvailable: available,
       biometryType,
@@ -225,10 +267,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   enrollBiometrics: async () => {
+    const { profile, user } = get();
+    const userId = profile?.userId || user?.userId || (user as any)?._id || (user as any)?.id;
+    if (!userId) {
+      throw new Error('User identity required to register biometric key.');
+    }
+
     set({ isLoading: true, error: null });
     try {
-      await biometricsService.enroll();
-      set({ isLoading: false, isBiometricEnrolled: true });
+      await biometricsService.enroll(userId);
+      set({
+        isLoading: false,
+        isBiometricEnrolled: true,
+        hasBiometric: true,
+      });
+      persistSession({ hasBiometric: true });
+      await get().fetchProfile();
     } catch (err) {
       const msg = extractErrorMessage(err);
       set({ isLoading: false, error: msg });
@@ -238,7 +292,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   verifyBiometrics: async () => {
     const { profile, user } = get();
-    const userId = profile?.userId || (user as any)?._id || (user as any)?.id;
+    const userId = profile?.userId || user?.userId || (user as any)?._id || (user as any)?.id;
     if (!userId) {
       throw new Error('User identifier not found.');
     }
@@ -247,6 +301,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const socketTokens = await biometricsService.authenticate(userId);
       if (socketTokens) {
+        setSocketTokens(socketTokens.socket_access_token, socketTokens.socket_refresh_token);
         set({
           isLoading: false,
           socketTokens,
@@ -257,8 +312,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return false;
     } catch (err) {
       const msg = extractErrorMessage(err);
-      set({ isLoading: false, error: msg });
+      if (msg.toLowerCase().includes('not found') || msg.toLowerCase().includes('biometric key')) {
+        set({ isLoading: false, hasBiometric: false, isBiometricEnrolled: false });
+      } else {
+        set({ isLoading: false, error: msg });
+      }
       throw new Error(msg);
+    }
+  },
+
+  restoreSession: (session: StoredSession) => {
+    if (session?.tokens?.access_token) {
+      setAuthTokens(session.tokens.access_token, session.tokens.refresh_token);
+      set({
+        user: session.user || null,
+        profile: session.profile || null,
+        tokens: session.tokens,
+        hasPin: !!session.hasPin,
+        hasBiometric: !!session.hasBiometric,
+        isAuthenticated: true,
+      });
     }
   },
 
@@ -269,6 +342,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch {
       // Ignore error on logout
     } finally {
+      storageService.removeItem('aura_auth_session');
       setAuthTokens(null, null);
       set({
         user: null,
@@ -280,6 +354,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         pendingEmail: null,
         registerToken: null,
         hasPin: false,
+        hasBiometric: false,
         isBiometricEnrolled: false,
         isLoading: false,
         error: null,

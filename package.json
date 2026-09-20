@@ -14,6 +14,7 @@
     "@react-native-community/netinfo": "^12.0.1",
     "@react-native-google-signin/google-signin": "^16.1.5",
     "@react-native/new-app-screen": "0.87.1",
+    "@react-navigation/bottom-tabs": "^7.19.2",
     "@react-navigation/native": "^7.4.1",
     "@react-navigation/native-stack": "^7.19.2",
     "@types/react-native-vector-icons": "^6.4.18",
@@ -31,6 +32,7 @@
     "react-native-safe-area-context": "^5.5.2",
     "react-native-screens": "^4.28.0",
     "react-native-size-matters": "^0.4.2",
+    "react-native-svg": "^15.15.5",
     "react-native-toast-message": "^2.5.2",
     "react-native-vector-icons": "^10.3.0",
     "react-native-webview": "^14.0.1",
@@ -63,5 +65,8 @@
   },
   "engines": {
     "node": ">= 22.11.0"
+  },
+  "overrides": {
+    "zod": "^3.24.2"
   }
 }

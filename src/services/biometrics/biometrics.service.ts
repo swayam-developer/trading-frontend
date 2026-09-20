@@ -44,14 +44,41 @@ export const biometricsService = {
   },
 
   /**
-   * Generate RSA 2048 public/private key pair on device and upload public key to server
+   * Enroll device biometric:
+   * 1. Clear any old keys on the device.
+   * 2. Generate a fresh RSA 2048 key pair.
+   * 3. Prompt the physical biometric sensor to sign the userId payload.
+   * 4. Upload the public key to the backend (/auth/upload-biometric).
    */
-  enroll: async (): Promise<string> => {
+  enroll: async (
+    userId: string,
+    promptMessage = 'Scan your fingerprint or Face ID to activate biometric security'
+  ): Promise<string> => {
+    // 1. Delete any existing keys to guarantee a clean state
+    await rnBiometrics.deleteKeys();
+
+    // 2. Generate fresh RSA 2048 key pair
     const { publicKey } = await rnBiometrics.createKeys();
     if (!publicKey) {
       throw new Error('Failed to generate biometric cryptographic keys on device.');
     }
 
+    // 3. Prompt user's biometric to sign userId payload
+    const { success, signature, error } = await rnBiometrics.createSignature({
+      promptMessage,
+      payload: userId,
+      cancelButtonText: 'Cancel',
+    });
+
+    if (!success || !signature) {
+      await rnBiometrics.deleteKeys();
+      if (error && error !== 'User cancellation') {
+        throw new Error(error);
+      }
+      throw new Error('Biometric scan was cancelled.');
+    }
+
+    // 4. Upload the public key to backend
     await userApi.uploadBiometric({ public_key: publicKey });
     return publicKey;
   },

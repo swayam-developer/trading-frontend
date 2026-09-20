@@ -45,7 +45,7 @@ export const LoginScreen: React.FC = () => {
       });
 
       const store = useAuthStore.getState();
-      if (store.hasPin) {
+      if (store.hasPin || store.hasBiometric) {
         navigation.replace('VerifyPin');
       } else {
         navigation.replace('SetPin');

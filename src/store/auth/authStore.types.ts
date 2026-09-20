@@ -12,6 +12,7 @@ export interface AuthState {
   pendingEmail: string | null;
   registerToken: string | null;
   hasPin: boolean;
+  hasBiometric: boolean;
   
   // Biometric State
   isBiometricsAvailable: boolean;
@@ -36,6 +37,7 @@ export interface AuthState {
   checkBiometrics: () => Promise<{ available: boolean; biometryType: string | null; enrolled: boolean }>;
   enrollBiometrics: () => Promise<void>;
   verifyBiometrics: () => Promise<boolean>;
+  restoreSession: (session: any) => void;
   logout: () => Promise<void>;
   clearError: () => void;
 }
