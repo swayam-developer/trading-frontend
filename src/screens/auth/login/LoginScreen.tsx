@@ -99,7 +99,7 @@ export const LoginScreen: React.FC = () => {
 
           <AuraInput
             label="Password"
-            icon="🔒"
+            icon="lock-closed-outline"
             placeholder="Enter your account password"
             value={password}
             onChangeText={(text) => {

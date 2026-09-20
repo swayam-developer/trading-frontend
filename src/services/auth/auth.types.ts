@@ -6,6 +6,7 @@ export interface CheckEmailRequest {
 
 export interface CheckEmailResponse {
   isExist: boolean;
+  otp?: string;
 }
 
 export interface SendOtpRequest {
@@ -15,6 +16,7 @@ export interface SendOtpRequest {
 
 export interface SendOtpResponse {
   msg: string;
+  otp?: string;
 }
 
 export interface VerifyOtpRequest {

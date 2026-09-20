@@ -1,66 +1,100 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useImperativeHandle } from 'react';
 import {
   View,
   TextInput,
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   TextInputProps,
 } from 'react-native';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 import { Colors } from '../../theme/colors';
 
-interface AuraInputProps extends TextInputProps {
+export interface AuraInputProps extends TextInputProps {
   label?: string;
   icon?: string;
   error?: string | null;
   isPassword?: boolean;
 }
 
-export const AuraInput: React.FC<AuraInputProps> = ({
-  label,
-  icon,
-  error,
-  isPassword = false,
-  ...props
-}) => {
-  const [isFocused, setIsFocused] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+export const AuraInput = React.forwardRef<any, AuraInputProps>(
+  ({ label, icon, error, isPassword = false, style, ...props }, ref) => {
+    const [isFocused, setIsFocused] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const localInputRef = useRef<any>(null);
 
-  return (
-    <View style={styles.container}>
-      {label && <Text style={styles.label}>{label}</Text>}
-      <View
-        style={[
-          styles.inputWrapper,
-          isFocused && styles.inputFocused,
-          !!error && styles.inputError,
-        ]}
-      >
-        {icon && <Text style={styles.icon}>{icon}</Text>}
-        <TextInput
-          style={styles.input}
-          placeholderTextColor={Colors.textPlaceholder}
-          secureTextEntry={isPassword && !showPassword}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          autoCapitalize="none"
-          {...props}
-        />
-        {isPassword && (
-          <TouchableOpacity
-            style={styles.eyeButton}
-            onPress={() => setShowPassword(!showPassword)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.eyeIcon}>{showPassword ? '👁' : '👁‍🗨'}</Text>
-          </TouchableOpacity>
-        )}
+    useImperativeHandle(ref, () => localInputRef.current);
+
+    const handleContainerPress = () => {
+      localInputRef.current?.focus();
+    };
+
+    return (
+      <View style={styles.container}>
+        {label && <Text style={styles.label}>{label}</Text>}
+        <Pressable
+          onPress={handleContainerPress}
+          style={[
+            styles.inputWrapper,
+            isFocused && styles.inputFocused,
+            !!error && styles.inputError,
+          ]}
+        >
+          {icon && (
+            <View style={styles.iconContainer} pointerEvents="none">
+              {icon.length > 2 ? (
+                <Icon
+                  name={icon}
+                  size={moderateScale(18)}
+                  color={isFocused ? Colors.primary : Colors.textMuted}
+                />
+              ) : (
+                <Text style={styles.iconText}>{icon}</Text>
+              )}
+            </View>
+          )}
+          <TextInput
+            ref={localInputRef}
+            style={[styles.input, style]}
+            placeholderTextColor={Colors.textPlaceholder}
+            secureTextEntry={isPassword && !showPassword}
+            onFocus={(e) => {
+              setIsFocused(true);
+              props.onFocus?.(e);
+            }}
+            onBlur={(e) => {
+              setIsFocused(false);
+              props.onBlur?.(e);
+            }}
+            autoCapitalize="none"
+            underlineColorAndroid="transparent"
+            textAlignVertical="center"
+            {...props}
+          />
+          {isPassword && (
+            <TouchableOpacity
+              style={styles.eyeButton}
+              onPress={() => setShowPassword(!showPassword)}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Icon
+                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                size={moderateScale(20)}
+                color={Colors.textMuted}
+              />
+            </TouchableOpacity>
+          )}
+        </Pressable>
+        {!!error && <Text style={styles.errorText}>{error}</Text>}
       </View>
-      {!!error && <Text style={styles.errorText}>{error}</Text>}
-    </View>
-  );
-};
+    );
+  }
+);
+
+AuraInput.displayName = 'AuraInput';
 
 const styles = StyleSheet.create({
   container: {
@@ -95,23 +129,27 @@ const styles = StyleSheet.create({
   inputError: {
     borderColor: Colors.error,
   },
-  icon: {
+  iconContainer: {
+    marginRight: scale(10),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconText: {
     fontSize: moderateScale(16),
     color: Colors.textMuted,
-    marginRight: scale(10),
   },
   input: {
     flex: 1,
+    height: '100%',
     color: Colors.textPrimary,
     fontSize: moderateScale(14),
     paddingVertical: 0,
+    paddingHorizontal: 0,
   },
   eyeButton: {
     padding: scale(6),
-  },
-  eyeIcon: {
-    fontSize: moderateScale(16),
-    color: Colors.textMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   errorText: {
     color: Colors.error,

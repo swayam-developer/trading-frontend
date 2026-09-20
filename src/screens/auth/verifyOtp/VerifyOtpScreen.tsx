@@ -111,7 +111,7 @@ export const VerifyOtpScreen: React.FC = () => {
 
           <AuraInput
             label="6-Digit OTP Code"
-            icon="🔑"
+            icon="key-outline"
             placeholder="e.g. 123456"
             value={otp}
             onChangeText={(text) => setOtp(text.replace(/[^0-9]/g, '').slice(0, 6))}

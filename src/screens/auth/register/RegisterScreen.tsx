@@ -101,7 +101,7 @@ export const RegisterScreen: React.FC = () => {
 
           <AuraInput
             label="Password"
-            icon="🔒"
+            icon="lock-closed-outline"
             placeholder="Min. 8 characters with numbers & symbols"
             value={password}
             onChangeText={setPassword}
@@ -138,7 +138,7 @@ export const RegisterScreen: React.FC = () => {
 
           <AuraInput
             label="Confirm Password"
-            icon="🔒"
+            icon="lock-closed-outline"
             placeholder="Re-enter your password"
             value={confirmPassword}
             onChangeText={setConfirmPassword}

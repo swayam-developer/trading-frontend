@@ -7,6 +7,7 @@ export type RootStackParamList = {
   VerifyOtp: {
     email: string;
     otp_type?: 'email' | 'phone' | 'reset_password' | 'reset_pin';
+    testOtp?: string;
   };
   Register: {
     email: string;

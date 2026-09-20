@@ -19,7 +19,7 @@ export interface AuthState {
 
   // Actions
   setPendingEmail: (email: string) => void;
-  checkEmail: (email: string) => Promise<{ isExist: boolean }>;
+  checkEmail: (email: string) => Promise<{ isExist: boolean; otp?: string }>;
   sendOtp: (email: string, otp_type?: 'email' | 'phone' | 'reset_password' | 'reset_pin') => Promise<string>;
   verifyOtp: (email: string, otp: string, otp_type?: OtpType) => Promise<string | undefined>;
   register: (password: string) => Promise<void>;

@@ -11,6 +11,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { RootNavigationProp } from '../../../navigation/types';
 import { Colors } from '../../../theme/colors';
 import { AuraLogo } from '../../../components/common/AuraLogo';
@@ -91,7 +92,7 @@ export const EmailCheckScreen: React.FC = () => {
 
           <AuraInput
             label="Email Address"
-            icon="✉"
+            icon="mail-outline"
             placeholder="name@example.com"
             value={email}
             onChangeText={(text) => {
@@ -127,13 +128,13 @@ export const EmailCheckScreen: React.FC = () => {
             }}
             activeOpacity={0.8}
           >
-            <Text style={styles.googleIcon}>G</Text>
+            <Icon name="logo-google" size={moderateScale(18)} color={Colors.textPrimary} style={styles.googleIcon} />
             <Text style={styles.googleButtonText}>Continue with Google</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.securityBadge}>
-          <Text style={styles.securityIcon}>🔒</Text>
+          <Icon name="shield-checkmark-outline" size={moderateScale(15)} color={Colors.primary} style={styles.securityIcon} />
           <Text style={styles.securityText}>
             256-Bit Bank-Grade SSL Encryption & Regulated Custody
           </Text>
