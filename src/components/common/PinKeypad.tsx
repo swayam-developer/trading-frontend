@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 import { Colors } from '../../theme/colors';
 
@@ -9,6 +10,9 @@ interface PinKeypadProps {
   onDigitPress: (digit: string) => void;
   onDeletePress: () => void;
   error?: string | null;
+  showBiometricButton?: boolean;
+  onBiometricPress?: () => void;
+  biometryType?: string | null;
 }
 
 export const PinKeypad: React.FC<PinKeypadProps> = ({
@@ -17,6 +21,9 @@ export const PinKeypad: React.FC<PinKeypadProps> = ({
   onDigitPress,
   onDeletePress,
   error,
+  showBiometricButton = false,
+  onBiometricPress,
+  biometryType,
 }) => {
   const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'];
 
@@ -45,6 +52,19 @@ export const PinKeypad: React.FC<PinKeypadProps> = ({
       <View style={styles.keypadGrid}>
         {digits.map((digit, index) => {
           if (digit === '') {
+            if (showBiometricButton && onBiometricPress) {
+              const iconName = biometryType === 'FaceID' ? 'scan-outline' : 'finger-print';
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={[styles.key, styles.biometricKey]}
+                  onPress={onBiometricPress}
+                  activeOpacity={0.6}
+                >
+                  <Icon name={iconName} size={moderateScale(28)} color={Colors.primary} />
+                </TouchableOpacity>
+              );
+            }
             return <View key={index} style={styles.emptyKey} />;
           }
 
@@ -135,6 +155,10 @@ const styles = StyleSheet.create({
     width: scale(72),
     height: scale(72),
     margin: scale(10),
+  },
+  biometricKey: {
+    backgroundColor: 'rgba(0, 229, 155, 0.08)',
+    borderColor: 'rgba(0, 229, 155, 0.25)',
   },
   deleteKey: {
     backgroundColor: 'transparent',

@@ -13,6 +13,11 @@ export interface AuthState {
   registerToken: string | null;
   hasPin: boolean;
   
+  // Biometric State
+  isBiometricsAvailable: boolean;
+  biometryType: string | null;
+  isBiometricEnrolled: boolean;
+  
   // Loading & Error States
   isLoading: boolean;
   error: string | null;
@@ -28,6 +33,9 @@ export interface AuthState {
   fetchProfile: () => Promise<ProfileResponse | null>;
   setPin: (pin: string) => Promise<void>;
   verifyPin: (pin: string) => Promise<boolean>;
+  checkBiometrics: () => Promise<{ available: boolean; biometryType: string | null; enrolled: boolean }>;
+  enrollBiometrics: () => Promise<void>;
+  verifyBiometrics: () => Promise<boolean>;
   logout: () => Promise<void>;
   clearError: () => void;
 }

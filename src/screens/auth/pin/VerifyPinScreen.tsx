@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, StatusBar, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
@@ -15,8 +15,50 @@ export const VerifyPinScreen: React.FC = () => {
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const { verifyPin, logout, profile, user } = useAuthStore();
+  const {
+    verifyPin,
+    verifyBiometrics,
+    checkBiometrics,
+    isBiometricsAvailable,
+    isBiometricEnrolled,
+    biometryType,
+    logout,
+    profile,
+    user,
+  } = useAuthStore();
+
   const displayName = profile?.name || user?.email || 'Trader';
+
+  const triggerBiometricAuth = useCallback(async () => {
+    try {
+      const verified = await verifyBiometrics();
+      if (verified) {
+        Toast.show({
+          type: 'success',
+          text1: 'Authenticated',
+          text2: 'Welcome back to Aura Trading.',
+        });
+        navigation.replace('Dashboard');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Biometric verification failed. Please enter your PIN.');
+    }
+  }, [verifyBiometrics, navigation]);
+
+  // Check biometric status and auto-prompt if enrolled
+  useEffect(() => {
+    const initBiometrics = async () => {
+      const { available, enrolled } = await checkBiometrics();
+      if (available && enrolled) {
+        // Auto-prompt after screen transition completes
+        setTimeout(() => {
+          triggerBiometricAuth();
+        }, 400);
+      }
+    };
+
+    initBiometrics();
+  }, [checkBiometrics, triggerBiometricAuth]);
 
   const handleDigitPress = async (digit: string) => {
     setError(null);
@@ -68,6 +110,9 @@ export const VerifyPinScreen: React.FC = () => {
         onDigitPress={handleDigitPress}
         onDeletePress={handleDeletePress}
         error={error}
+        showBiometricButton={isBiometricsAvailable && isBiometricEnrolled}
+        onBiometricPress={triggerBiometricAuth}
+        biometryType={biometryType}
       />
 
       <TouchableOpacity

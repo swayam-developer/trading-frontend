@@ -3,6 +3,7 @@ import { AuthState } from './authStore.types';
 import { authApi } from '../../services/auth/auth.api';
 import { userApi } from '../../services/user/user.api';
 import { setAuthTokens } from '../../services/apiClient';
+import { biometricsService } from '../../services/biometrics/biometrics.service';
 
 const extractErrorMessage = (error: unknown): string => {
   if (error && typeof error === 'object') {
@@ -24,6 +25,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   pendingEmail: null,
   registerToken: null,
   hasPin: false,
+  isBiometricsAvailable: false,
+  biometryType: null,
+  isBiometricEnrolled: false,
   isLoading: false,
   error: null,
 
@@ -87,12 +91,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         register_token: registerToken,
       });
 
-      setAuthTokens(res.tokens.access_token, res.tokens.refresh_token);
+      const tokens = res.tokens || res.token;
+      if (tokens) {
+        setAuthTokens(tokens.access_token, tokens.refresh_token);
+      }
 
       set({
         isLoading: false,
         user: res.user,
-        tokens: res.tokens,
+        tokens: tokens || null,
         isAuthenticated: true,
       });
 
@@ -117,12 +124,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         password,
       });
 
-      setAuthTokens(res.tokens.access_token, res.tokens.refresh_token);
+      const tokens = res.tokens || res.token;
+      if (tokens) {
+        setAuthTokens(tokens.access_token, tokens.refresh_token);
+      }
 
       set({
         isLoading: false,
         user: res.user,
-        tokens: res.tokens,
+        tokens: tokens || null,
         isAuthenticated: true,
       });
 
@@ -138,12 +148,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const res = await authApi.oauthLogin({ provider, id_token: idToken });
-      setAuthTokens(res.tokens.access_token, res.tokens.refresh_token);
+      const tokens = res.tokens || (res as any).token;
+      if (tokens) {
+        setAuthTokens(tokens.access_token, tokens.refresh_token);
+      }
 
       set({
         isLoading: false,
         user: res.user,
-        tokens: res.tokens,
+        tokens: tokens || null,
         isAuthenticated: true,
       });
 
@@ -200,6 +213,55 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
+  checkBiometrics: async () => {
+    const { available, biometryType } = await biometricsService.checkAvailability();
+    const enrolled = available ? await biometricsService.checkKeysExist() : false;
+    set({
+      isBiometricsAvailable: available,
+      biometryType,
+      isBiometricEnrolled: enrolled,
+    });
+    return { available, biometryType, enrolled };
+  },
+
+  enrollBiometrics: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      await biometricsService.enroll();
+      set({ isLoading: false, isBiometricEnrolled: true });
+    } catch (err) {
+      const msg = extractErrorMessage(err);
+      set({ isLoading: false, error: msg });
+      throw new Error(msg);
+    }
+  },
+
+  verifyBiometrics: async () => {
+    const { profile, user } = get();
+    const userId = profile?.userId || (user as any)?._id || (user as any)?.id;
+    if (!userId) {
+      throw new Error('User identifier not found.');
+    }
+
+    set({ isLoading: true, error: null });
+    try {
+      const socketTokens = await biometricsService.authenticate(userId);
+      if (socketTokens) {
+        set({
+          isLoading: false,
+          socketTokens,
+        });
+        return true;
+      }
+      set({ isLoading: false });
+      return false;
+    } catch (err) {
+      const msg = extractErrorMessage(err);
+      set({ isLoading: false, error: msg });
+      throw new Error(msg);
+    }
+  },
+
   logout: async () => {
     set({ isLoading: true });
     try {
@@ -218,6 +280,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         pendingEmail: null,
         registerToken: null,
         hasPin: false,
+        isBiometricEnrolled: false,
         isLoading: false,
         error: null,
       });

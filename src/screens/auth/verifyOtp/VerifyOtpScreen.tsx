@@ -21,9 +21,9 @@ import { useAuthStore } from '../../../store/auth/authStore';
 export const VerifyOtpScreen: React.FC = () => {
   const navigation = useNavigation<RootNavigationProp<'VerifyOtp'>>();
   const route = useRoute<RootRouteProp<'VerifyOtp'>>();
-  const { email, otp_type = 'email' } = route.params;
+  const { email, otp_type = 'email', testOtp } = route.params;
 
-  const [otp, setOtp] = useState('');
+  const [otp, setOtp] = useState(testOtp || '');
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
 
@@ -108,6 +108,16 @@ export const VerifyOtpScreen: React.FC = () => {
             We have sent a 6-digit verification code to{' '}
             <Text style={styles.emailHighlight}>{email}</Text>
           </Text>
+
+          {testOtp ? (
+            <View style={styles.testOtpBanner}>
+              <Text style={styles.testOtpLabel}>🧪 Test Mode (SMTP Disabled)</Text>
+              <Text style={styles.testOtpValue}>
+                Your OTP code is:{' '}
+                <Text style={styles.testOtpCode}>{testOtp}</Text>
+              </Text>
+            </View>
+          ) : null}
 
           <AuraInput
             label="6-Digit OTP Code"
@@ -210,5 +220,32 @@ const styles = StyleSheet.create({
   backButtonText: {
     color: Colors.textMuted,
     fontSize: moderateScale(12),
+  },
+  testOtpBanner: {
+    backgroundColor: 'rgba(255, 179, 0, 0.12)',
+    borderColor: 'rgba(255, 179, 0, 0.35)',
+    borderWidth: 1,
+    borderRadius: moderateScale(8),
+    padding: scale(10),
+    marginBottom: verticalScale(14),
+    alignItems: 'center',
+  },
+  testOtpLabel: {
+    color: '#FFB300',
+    fontSize: moderateScale(11),
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: verticalScale(3),
+  },
+  testOtpValue: {
+    color: Colors.textPrimary,
+    fontSize: moderateScale(13),
+  },
+  testOtpCode: {
+    color: Colors.primary,
+    fontWeight: 'bold',
+    fontSize: moderateScale(16),
+    letterSpacing: 2,
   },
 });

@@ -56,12 +56,16 @@ export const EmailCheckScreen: React.FC = () => {
       } else {
         Toast.show({
           type: 'success',
-          text1: 'New Account',
-          text2: 'Verification code sent to your email.',
+          text1: result.otp ? `Test OTP: ${result.otp}` : 'New Account',
+          text2: result.otp
+            ? 'SMTP disabled for testing. Use this code to verify.'
+            : 'Verification code sent to your email.',
+          visibilityTime: 10000,
         });
         navigation.navigate('VerifyOtp', {
           email: email.trim(),
           otp_type: 'email',
+          testOtp: result.otp,
         });
       }
     } catch (err: any) {

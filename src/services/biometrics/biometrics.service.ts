@@ -1,0 +1,95 @@
+import ReactNativeBiometrics, { BiometryType } from 'react-native-biometrics';
+import { userApi } from '../user/user.api';
+import { SocketTokens } from '../user/user.types';
+
+const rnBiometrics = new ReactNativeBiometrics({ allowDeviceCredentials: false });
+
+export interface BiometricsAvailability {
+  available: boolean;
+  biometryType: BiometryType | null;
+  error?: string;
+}
+
+export const biometricsService = {
+  /**
+   * Check if the device hardware supports biometric authentication and has enrolled credentials
+   */
+  checkAvailability: async (): Promise<BiometricsAvailability> => {
+    try {
+      const { available, biometryType, error } = await rnBiometrics.isSensorAvailable();
+      return {
+        available: !!available,
+        biometryType: biometryType || null,
+        error,
+      };
+    } catch (err: any) {
+      return {
+        available: false,
+        biometryType: null,
+        error: err?.message || 'Biometrics check failed',
+      };
+    }
+  },
+
+  /**
+   * Check if RSA key pair exists on the device keystore/keychain
+   */
+  checkKeysExist: async (): Promise<boolean> => {
+    try {
+      const { keysExist } = await rnBiometrics.biometricKeysExist();
+      return !!keysExist;
+    } catch {
+      return false;
+    }
+  },
+
+  /**
+   * Generate RSA 2048 public/private key pair on device and upload public key to server
+   */
+  enroll: async (): Promise<string> => {
+    const { publicKey } = await rnBiometrics.createKeys();
+    if (!publicKey) {
+      throw new Error('Failed to generate biometric cryptographic keys on device.');
+    }
+
+    await userApi.uploadBiometric({ public_key: publicKey });
+    return publicKey;
+  },
+
+  /**
+   * Prompt biometric authentication dialog, sign userId payload with device private key,
+   * and verify signature on backend to obtain WebSocket tokens.
+   */
+  authenticate: async (
+    userId: string,
+    promptMessage = 'Confirm fingerprint or Face ID to unlock'
+  ): Promise<SocketTokens | null> => {
+    const { success, signature, error } = await rnBiometrics.createSignature({
+      promptMessage,
+      payload: userId,
+      cancelButtonText: 'Use PIN',
+    });
+
+    if (!success || !signature) {
+      if (error && error !== 'User cancellation') {
+        throw new Error(error);
+      }
+      return null;
+    }
+
+    const res = await userApi.verifyBiometric({ signature });
+    return res.socket_tokens || null;
+  },
+
+  /**
+   * Delete biometric keys from device keystore/keychain
+   */
+  deleteKeys: async (): Promise<boolean> => {
+    try {
+      const { keysDeleted } = await rnBiometrics.deleteKeys();
+      return !!keysDeleted;
+    } catch {
+      return false;
+    }
+  },
+};

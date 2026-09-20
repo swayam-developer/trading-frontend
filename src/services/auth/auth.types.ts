@@ -57,6 +57,7 @@ export interface AuthTokens {
 export interface RegisterResponse {
   user: UserEntity;
   tokens: AuthTokens;
+  token?: AuthTokens;
 }
 
 export interface LoginRequest {
@@ -66,7 +67,8 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   user: UserEntity;
-  tokens: AuthTokens;
+  tokens?: AuthTokens;
+  token?: AuthTokens;
 }
 
 export interface OAuthRequest {
