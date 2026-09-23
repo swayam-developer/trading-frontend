@@ -16,8 +16,19 @@ export const SplashScreen: React.FC = () => {
     let isCancelled = false;
 
     const routeUser = async () => {
-      // 1. Give storage a moment to restore session from disk
-      await storageService.getItemAsync('aura_auth_session');
+      // 1. Initialize native storage and restore session
+      await storageService.init();
+      const rawSession = storageService.getItem('aura_auth_session');
+      if (rawSession && !useAuthStore.getState().isAuthenticated) {
+        try {
+          const session = JSON.parse(rawSession);
+          if (session?.tokens?.access_token) {
+            useAuthStore.getState().restoreSession(session);
+          }
+        } catch (e) {
+          console.warn('[SplashScreen] Failed to parse session:', e);
+        }
+      }
 
       // 2. Minimum splash screen duration for smooth branded experience
       await new Promise<void>((resolve) => setTimeout(() => resolve(), 1800));

@@ -9,6 +9,11 @@ import {
   AuthorizationStatus,
   RemoteMessage,
 } from '@react-native-firebase/messaging';
+import {
+  getInAppMessaging,
+  setMessagesDisplaySuppressed,
+  setAutomaticDataCollectionEnabled,
+} from '@react-native-firebase/in-app-messaging';
 import { PermissionsAndroid, Platform } from 'react-native';
 import Toast from 'react-native-toast-message';
 
@@ -68,13 +73,23 @@ class NotificationService {
   }
 
   /**
-   * Initialize notification handlers and foreground listener
+   * Initialize notification handlers, foreground listener, and In-App Messaging
    */
   initializeListeners(onNotificationClick?: (message: RemoteMessage) => void) {
     try {
+      // 1. Enable Firebase In-App Messaging display
+      try {
+        const inAppMessagingInstance = getInAppMessaging();
+        setMessagesDisplaySuppressed(inAppMessagingInstance, false).catch(() => {});
+        setAutomaticDataCollectionEnabled(inAppMessagingInstance, true).catch(() => {});
+        console.log('[NotificationService] Firebase In-App Messaging display active.');
+      } catch (fiamError) {
+        console.warn('[NotificationService] In-App Messaging init warning:', fiamError);
+      }
+
       const messagingInstance = getMessaging();
 
-      // 1. Listen for foreground notifications
+      // 2. Listen for foreground push notifications
       const unsubscribeForeground = onMessage(messagingInstance, async (remoteMessage: RemoteMessage) => {
         console.log('[NotificationService] Foreground notification received:', remoteMessage);
 
@@ -95,7 +110,7 @@ class NotificationService {
         });
       });
 
-      // 2. Notification opened while app was in background
+      // 3. Push notification opened while app was in background
       const unsubscribeNotificationOpened = onNotificationOpenedApp(messagingInstance, (remoteMessage: RemoteMessage) => {
         console.log('[NotificationService] Notification opened from background:', remoteMessage);
         if (onNotificationClick) {
@@ -103,7 +118,7 @@ class NotificationService {
         }
       });
 
-      // 3. Notification opened while app was completely closed (quit state)
+      // 4. Push notification opened while app was completely closed (quit state)
       getInitialNotification(messagingInstance)
         .then((remoteMessage: RemoteMessage | null) => {
           if (remoteMessage) {
@@ -114,7 +129,7 @@ class NotificationService {
           }
         });
 
-      // 4. Token refresh listener
+      // 5. Token refresh listener
       const unsubscribeTokenRefresh = onTokenRefresh(messagingInstance, (newToken: string) => {
         console.log('[NotificationService] FCM Token refreshed:', newToken);
         this.currentFcmToken = newToken;
