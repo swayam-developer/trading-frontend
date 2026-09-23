@@ -5,6 +5,7 @@ import { userApi } from '../../services/user/user.api';
 import { setAuthTokens, setSocketTokens } from '../../services/apiClient';
 import { biometricsService } from '../../services/biometrics/biometrics.service';
 import { storageService, StoredSession } from '../../services/storage/storage.service';
+import { notificationService } from '../../services/notification/notificationService';
 
 const extractErrorMessage = (error: unknown): string => {
   if (error && typeof error === 'object') {
@@ -102,10 +103,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
     set({ isLoading: true, error: null });
     try {
+      const fcmToken = await notificationService.getFcmToken().catch(() => null);
       const res = await authApi.register({
         email: pendingEmail,
         password,
         register_token: registerToken,
+        fcmToken,
       });
 
       const tokens = res.tokens || res.token;
@@ -137,9 +140,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
     set({ isLoading: true, error: null });
     try {
+      const fcmToken = await notificationService.getFcmToken().catch(() => null);
       const res = await authApi.login({
         email: pendingEmail,
         password,
+        fcmToken,
       });
 
       const tokens = res.tokens || res.token;
@@ -167,7 +172,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   oauthLogin: async (provider: 'google' | 'apple', idToken: string) => {
     set({ isLoading: true, error: null });
     try {
-      const res = await authApi.oauthLogin({ provider, id_token: idToken });
+      const fcmToken = await notificationService.getFcmToken().catch(() => null);
+      const res = await authApi.oauthLogin({ provider, id_token: idToken, fcmToken });
       const tokens = res.tokens || (res as any).token;
       if (tokens) {
         setAuthTokens(tokens.access_token, tokens.refresh_token);
@@ -364,3 +370,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   clearError: () => set({ error: null }),
 }));
+
+// Sync refreshed FCM tokens if user is logged in
+notificationService.setOnTokenRefresh(async (newToken) => {
+  if (useAuthStore.getState().isAuthenticated) {
+    try {
+      await userApi.updateFcmToken(newToken);
+      console.log('[authStore] Refreshed FCM token synced with backend.');
+    } catch (err) {
+      console.warn('[authStore] Failed to sync refreshed FCM token:', err);
+    }
+  }
+});
+

@@ -35,6 +35,7 @@ export interface RegisterRequest {
   email: string;
   password: string;
   register_token: string;
+  fcmToken?: string | null;
 }
 
 export interface UserEntity {
@@ -66,6 +67,7 @@ export interface RegisterResponse {
 export interface LoginRequest {
   email: string;
   password: string;
+  fcmToken?: string | null;
 }
 
 export interface LoginResponse {
@@ -77,6 +79,7 @@ export interface LoginResponse {
 export interface OAuthRequest {
   provider: 'google' | 'apple';
   id_token: string;
+  fcmToken?: string | null;
 }
 
 export interface RefreshTokenRequest {

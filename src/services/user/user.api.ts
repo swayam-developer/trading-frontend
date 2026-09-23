@@ -70,4 +70,12 @@ export const userApi = {
     const response = await apiClient.post<LogoutResponse>('/auth/logout');
     return response.data;
   },
+
+  /**
+   * Update device FCM registration token
+   */
+  updateFcmToken: async (fcmToken: string): Promise<{ success: boolean; message: string }> => {
+    const response = await apiClient.post<{ success: boolean; message: string }>('/auth/fcm-token', { fcmToken });
+    return response.data;
+  },
 };
