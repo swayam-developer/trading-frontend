@@ -35,7 +35,7 @@ export const VerifyOtpScreen: React.FC = () => {
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
 
-  const inputRefs = useRef<Array<TextInput | null>>([]);
+  const inputRefs = useRef<any[]>([]);
   const { verifyOtp, sendOtp, isLoading } = useAuthStore();
 
   const currentOtp = otpArray.join('');
@@ -175,7 +175,7 @@ export const VerifyOtpScreen: React.FC = () => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar barStyle="light-content" backgroundColor={Colors.background} />
+      <StatusBar barStyle="light-content" />
 
       {/* Ambient Backlight Glow */}
       <View style={styles.ambientGlowTop} pointerEvents="none" />
@@ -243,7 +243,9 @@ export const VerifyOtpScreen: React.FC = () => {
                   ]}
                 >
                   <TextInput
-                    ref={(el) => (inputRefs.current[index] = el)}
+                    ref={(el) => {
+                      inputRefs.current[index] = el;
+                    }}
                     style={styles.otpInput}
                     value={digit}
                     onChangeText={(text) => handleOtpChange(text, index)}

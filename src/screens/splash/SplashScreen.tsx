@@ -236,11 +236,7 @@ export const SplashScreen: React.FC = () => {
 
       const auth = useAuthStore.getState();
       if (auth.isAuthenticated) {
-        if (auth.hasPin || auth.hasBiometric) {
-          navigation.replace('VerifyPin');
-        } else {
-          navigation.replace('SetPin');
-        }
+        navigation.replace('VerifyPin');
       } else {
         navigation.replace('EmailCheck');
       }

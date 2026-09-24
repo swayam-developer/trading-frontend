@@ -23,6 +23,7 @@ export const VerifyPinScreen: React.FC = () => {
     verifyBiometrics,
     enrollBiometrics,
     checkBiometrics,
+    fetchProfile,
     isBiometricsAvailable,
     isBiometricEnrolled,
     biometryType,
@@ -76,22 +77,34 @@ export const VerifyPinScreen: React.FC = () => {
     }
   }, [verifyBiometrics, navigation]);
 
-  // Auto-prompt biometrics only once on mount
+  // Initial sync & auto-prompt biometrics if user configured biometrics (or both)
   useEffect(() => {
-    if (hasPromptedRef.current) return;
+    let isMounted = true;
 
-    const initBiometrics = async () => {
-      const { available, enrolled } = await checkBiometrics();
-      if (available && enrolled && hasBiometric && !hasPromptedRef.current) {
+    const initScreen = async () => {
+      await Promise.allSettled([fetchProfile(), checkBiometrics()]);
+      if (!isMounted) return;
+
+      const store = useAuthStore.getState();
+      const userHasBio =
+        store.hasBiometric ||
+        store.isBiometricEnrolled ||
+        !!store.profile?.biometric_exist;
+
+      if (userHasBio && !hasPromptedRef.current) {
         hasPromptedRef.current = true;
         setTimeout(() => {
           triggerBiometricAuth();
-        }, 400);
+        }, 350);
       }
     };
 
-    initBiometrics();
-  }, [checkBiometrics, hasBiometric, triggerBiometricAuth]);
+    initScreen();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchProfile, checkBiometrics, triggerBiometricAuth]);
 
   const handleDigitPress = async (digit: string) => {
     setError(null);
@@ -142,11 +155,15 @@ export const VerifyPinScreen: React.FC = () => {
     }
   };
 
-  // If user has ONLY Biometrics enrolled and NO PIN:
-  if (!hasPin && (isBiometricEnrolled || hasBiometric)) {
+  // Determine user's active unlock configuration
+  const userHasPin = hasPin || !!profile?.login_pin_exist;
+  const userHasBio = hasBiometric || !!profile?.biometric_exist || isBiometricEnrolled;
+
+  // Case 1: If user has ONLY Biometrics configured and NO PIN
+  if (!userHasPin && userHasBio) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor={Colors.background} />
+        <StatusBar barStyle="light-content" />
 
         <View style={styles.ambientGlowTop} pointerEvents="none" />
         <View style={styles.ambientGlowBottom} pointerEvents="none" />
@@ -215,10 +232,10 @@ export const VerifyPinScreen: React.FC = () => {
     );
   }
 
-  // If user has PIN or BOTH methods:
+  // Case 2 & 3: User has MPIN or BOTH (MPIN + Biometrics)
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.background} />
+      <StatusBar barStyle="light-content" />
 
       <View style={styles.ambientGlowTop} pointerEvents="none" />
       <View style={styles.ambientGlowBottom} pointerEvents="none" />
@@ -235,7 +252,11 @@ export const VerifyPinScreen: React.FC = () => {
         </View>
 
         <Text style={styles.title}>Unlock Portfolio</Text>
-        <Text style={styles.subtitle}>Enter your 4-digit MPIN to resume trading</Text>
+        <Text style={styles.subtitle}>
+          {userHasBio
+            ? `Unlock with ${biometricName} or 4-digit MPIN`
+            : 'Enter your 4-digit MPIN to resume trading'}
+        </Text>
       </View>
 
       <PinKeypad
@@ -244,13 +265,13 @@ export const VerifyPinScreen: React.FC = () => {
         onDigitPress={handleDigitPress}
         onDeletePress={handleDeletePress}
         error={error}
-        showBiometricButton={isBiometricsAvailable && isBiometricEnrolled && hasBiometric}
+        showBiometricButton={isBiometricsAvailable && (userHasBio || hasBiometric)}
         onBiometricPress={triggerBiometricAuth}
         biometryType={biometryType}
       />
 
       <View style={styles.footer}>
-        {isBiometricsAvailable && isBiometricEnrolled && hasBiometric && (
+        {isBiometricsAvailable && (userHasBio || hasBiometric) && (
           <TouchableOpacity
             style={styles.bioQuickButton}
             onPress={triggerBiometricAuth}

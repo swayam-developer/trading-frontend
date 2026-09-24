@@ -1,5 +1,6 @@
 import Toast from 'react-native-toast-message';
 import { MarketStatusData } from '../stock/stock.types';
+import { useAuthStore } from '../../store/auth/authStore';
 
 class MarketAlertService {
   private lastAlertKey: string | null = null;
@@ -7,12 +8,28 @@ class MarketAlertService {
   private MIN_ALERT_INTERVAL_MS = 60000; // 1 minute auto-throttle for identical alerts
 
   /**
+   * Reset alert cache (e.g. on logout)
+   */
+  public reset(): void {
+    this.lastAlertKey = null;
+    this.lastAlertTime = 0;
+  }
+
+  /**
    * Display a structured market status toast alert to the user.
+   * Only displays if the user is authenticated / logged in.
    * @param status Current market status data from backend
    * @param force Set to true when triggered manually by user tap
    */
   public showMarketAlert(status: MarketStatusData, force = false): void {
     if (!status) return;
+
+    // Strict guard: User must be logged in and authenticated to receive market notifications
+    const authState = useAuthStore.getState();
+    if (!authState.isAuthenticated || !authState.tokens?.access_token) {
+      console.log('[MarketAlertService] Suppressing market status notification: User not logged in.');
+      return;
+    }
 
     const alertKey = this.generateAlertKey(status);
     const now = Date.now();

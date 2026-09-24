@@ -68,6 +68,12 @@ export const useStockStore = create<StockState>((set, get) => ({
   },
 
   initSocket: () => {
+    const authState = useAuthStore.getState();
+    if (!authState.isAuthenticated || !authState.tokens?.access_token) {
+      console.log('[stockStore] Socket init deferred: User not authenticated.');
+      return;
+    }
+
     socketService.connect();
     get().fetchMarketStatus();
     socketService.onStockUpdate((stock) => {
@@ -75,7 +81,9 @@ export const useStockStore = create<StockState>((set, get) => ({
     });
     socketService.onMarketStatus((status) => {
       set({ marketStatus: status });
-      marketAlertService.showMarketAlert(status);
+      if (useAuthStore.getState().isAuthenticated) {
+        marketAlertService.showMarketAlert(status);
+      }
     });
     socketService.onStatusChange((connected) => {
       if (connected) {
@@ -123,7 +131,9 @@ export const useStockStore = create<StockState>((set, get) => ({
       if (status) {
         socketService.setMarketStatus(status);
         set({ marketStatus: status });
-        marketAlertService.showMarketAlert(status);
+        if (useAuthStore.getState().isAuthenticated) {
+          marketAlertService.showMarketAlert(status);
+        }
       }
       return status || null;
     } catch (err) {

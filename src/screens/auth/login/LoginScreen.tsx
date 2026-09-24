@@ -60,7 +60,14 @@ export const LoginScreen: React.FC = () => {
       });
 
       const store = useAuthStore.getState();
-      if (store.hasPin || store.hasBiometric) {
+      const hasSecuritySet =
+        store.hasPin ||
+        store.hasBiometric ||
+        !!store.profile?.login_pin_exist ||
+        !!store.profile?.biometric_exist ||
+        !!store.user?.login_pin_exist;
+
+      if (hasSecuritySet) {
         navigation.replace('VerifyPin');
       } else {
         navigation.replace('SetPin');
@@ -119,7 +126,7 @@ export const LoginScreen: React.FC = () => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar barStyle="light-content" backgroundColor={Colors.background} />
+      <StatusBar barStyle="light-content" />
 
       {/* Ambient Backlight Glow */}
       <View style={styles.ambientGlowTop} pointerEvents="none" />

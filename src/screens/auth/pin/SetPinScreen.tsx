@@ -42,17 +42,33 @@ export const SetPinScreen: React.FC = () => {
     biometryType,
     hasPin,
     hasBiometric,
+    profile,
+    fetchProfile,
   } = useAuthStore();
 
   useEffect(() => {
+    let isMounted = true;
     const init = async () => {
-      await checkBiometrics();
-      if (hasPin || hasBiometric) {
+      await Promise.allSettled([checkBiometrics(), fetchProfile()]);
+      if (!isMounted) return;
+
+      const store = useAuthStore.getState();
+      const alreadyHasSecurity =
+        store.hasPin ||
+        store.hasBiometric ||
+        !!store.profile?.login_pin_exist ||
+        !!store.profile?.biometric_exist;
+
+      if (alreadyHasSecurity) {
         navigation.replace('VerifyPin');
       }
     };
     init();
-  }, [checkBiometrics, hasPin, hasBiometric, navigation]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [checkBiometrics, fetchProfile, hasPin, hasBiometric, navigation]);
 
   const biometricName = biometryType === 'FaceID' ? 'Face ID' : 'Fingerprint';
   const biometricIcon = biometryType === 'FaceID' ? 'scan-outline' : 'finger-print-outline';
@@ -159,7 +175,7 @@ export const SetPinScreen: React.FC = () => {
   if (mode === 'pin_create' || mode === 'pin_confirm') {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor={Colors.background} />
+        <StatusBar barStyle="light-content" />
 
         {/* Ambient Backlight Glow */}
         <View style={styles.ambientGlowTop} pointerEvents="none" />
@@ -211,7 +227,7 @@ export const SetPinScreen: React.FC = () => {
   if (mode === 'already_configured') {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor={Colors.background} />
+        <StatusBar barStyle="light-content" />
 
         <View style={styles.ambientGlowTop} pointerEvents="none" />
         <View style={styles.ambientGlowBottom} pointerEvents="none" />
@@ -250,7 +266,7 @@ export const SetPinScreen: React.FC = () => {
   // --- Render Security Options Choice Screen ---
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.background} />
+      <StatusBar barStyle="light-content" />
 
       {/* Ambient Backlight Glow */}
       <View style={styles.ambientGlowTop} pointerEvents="none" />

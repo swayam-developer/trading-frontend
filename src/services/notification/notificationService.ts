@@ -95,6 +95,24 @@ class NotificationService {
 
         const title = remoteMessage.notification?.title || 'Notification';
         const body = remoteMessage.notification?.body || '';
+        const msgType = (remoteMessage.data?.type || '').toString().toUpperCase();
+
+        const isMarketRelated =
+          msgType.includes('MARKET') ||
+          title.toLowerCase().includes('market') ||
+          body.toLowerCase().includes('market');
+
+        // Check if authStore is authenticated
+        try {
+          const { useAuthStore } = require('../../store/auth/authStore');
+          const isAuthed = useAuthStore.getState().isAuthenticated;
+          if (isMarketRelated && !isAuthed) {
+            console.log('[NotificationService] Suppressing market status notification: User not logged in.');
+            return;
+          }
+        } catch {
+          // If authStore is unresolvable at runtime, proceed safely
+        }
 
         Toast.show({
           type: 'info',

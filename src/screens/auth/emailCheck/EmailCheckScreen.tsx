@@ -89,7 +89,7 @@ export const EmailCheckScreen: React.FC = () => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar barStyle="light-content" backgroundColor={Colors.background} />
+      <StatusBar barStyle="light-content" />
 
       {/* Ambient Background Glow Effect */}
       <View style={styles.ambientGlowTop} pointerEvents="none" />

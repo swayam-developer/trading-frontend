@@ -7,6 +7,9 @@ import { biometricsService } from '../../services/biometrics/biometrics.service'
 import { storageService, StoredSession } from '../../services/storage/storage.service';
 import { keychainService } from '../../services/storage/keychain.service';
 import { notificationService } from '../../services/notification/notificationService';
+import { socketService } from '../../services/socket/socket.service';
+import { marketAlertService } from '../../services/marketAlert/marketAlert.service';
+import Toast from 'react-native-toast-message';
 
 const extractErrorMessage = (error: unknown): string => {
   if (error && typeof error === 'object') {
@@ -395,6 +398,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch {
       // Ignore error on logout
     } finally {
+      marketAlertService.reset();
+      socketService.disconnect();
+      Toast.hide();
       storageService.removeItem('aura_auth_session');
       await keychainService.clearTokens();
       setAuthTokens(null, null);
