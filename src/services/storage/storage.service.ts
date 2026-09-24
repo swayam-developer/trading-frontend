@@ -7,9 +7,14 @@ export interface StoredSession {
     access_token: string;
     refresh_token: string;
   };
+  socketTokens?: {
+    socket_access_token: string;
+    socket_refresh_token: string;
+  };
   hasPin: boolean;
   hasBiometric: boolean;
 }
+
 
 class StorageService {
   private cache: Map<string, string> = new Map();

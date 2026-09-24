@@ -1,10 +1,12 @@
-import { Stock, Holding, Order } from '../../services/stock/stock.types';
+import { Stock, Holding, Order, MarketStatusData } from '../../services/stock/stock.types';
 
 export interface StockState {
   stocks: Stock[];
   holdings: Holding[];
   orders: Order[];
   selectedStock: Stock | null;
+  isSocketConnected: boolean;
+  marketStatus: MarketStatusData | null;
 
   isLoadingStocks: boolean;
   isLoadingHoldings: boolean;
@@ -14,11 +16,17 @@ export interface StockState {
 
   // Actions
   fetchStocks: () => Promise<Stock[]>;
+  fetchStockDetail: (symbol: string) => Promise<Stock | null>;
+  fetchMarketStatus: () => Promise<MarketStatusData | null>;
   fetchHoldings: () => Promise<Holding[]>;
   fetchOrders: () => Promise<Order[]>;
   setSelectedStock: (stock: Stock | null) => void;
+  updateLiveStock: (stock: Stock) => void;
+  initSocket: () => void;
   buyStock: (stockId: string, quantity: number) => Promise<void>;
   sellStock: (holdingId: string, quantity: number) => Promise<void>;
   refreshAll: () => Promise<void>;
   clearError: () => void;
 }
+
+

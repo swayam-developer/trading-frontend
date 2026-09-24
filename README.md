@@ -99,4 +99,4 @@ To learn more about React Native, take a look at the following resources:
 
 
  .\gradlew assembleDebug
- adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+adb install -r android/app/build/outputs/apk/release/app-release.apk

@@ -5,6 +5,7 @@ import { userApi } from '../../services/user/user.api';
 import { setAuthTokens, setSocketTokens } from '../../services/apiClient';
 import { biometricsService } from '../../services/biometrics/biometrics.service';
 import { storageService, StoredSession } from '../../services/storage/storage.service';
+import { keychainService } from '../../services/storage/keychain.service';
 import { notificationService } from '../../services/notification/notificationService';
 
 const extractErrorMessage = (error: unknown): string => {
@@ -30,7 +31,16 @@ const persistSession = (data?: Partial<StoredSession>) => {
     hasBiometric: data?.hasBiometric !== undefined ? data.hasBiometric : state.hasBiometric,
   };
   storageService.setItem('aura_auth_session', JSON.stringify(session));
+
+  // Also persist in hardware-backed Keychain
+  keychainService.saveTokens({
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+    socket_access_token: state.socketTokens?.socket_access_token,
+    socket_refresh_token: state.socketTokens?.socket_refresh_token,
+  });
 };
+
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
@@ -305,12 +315,42 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     set({ isLoading: true, error: null });
     try {
-      const socketTokens = await biometricsService.authenticate(userId);
-      if (socketTokens) {
-        setSocketTokens(socketTokens.socket_access_token, socketTokens.socket_refresh_token);
+      // 1. Authenticate with device hardware sensor
+      const { success, signature } = await biometricsService.authenticate(userId);
+      if (success) {
+        // 2. Retrieve hardware-secured tokens from Keychain
+        let secureTokens = await keychainService.getTokens();
+
+        if (secureTokens?.access_token) {
+          setAuthTokens(secureTokens.access_token, secureTokens.refresh_token);
+        }
+
+        // If socket tokens are present in Keychain, restore them immediately
+        if (secureTokens?.socket_access_token && secureTokens?.socket_refresh_token) {
+          setSocketTokens(secureTokens.socket_access_token, secureTokens.socket_refresh_token);
+          set({
+            socketTokens: {
+              socket_access_token: secureTokens.socket_access_token,
+              socket_refresh_token: secureTokens.socket_refresh_token,
+            },
+          });
+        } else if (signature) {
+          // If socket tokens weren't in Keychain yet, sync them once
+          try {
+            const res = await userApi.verifyBiometric({ signature });
+            if (res?.socket_tokens) {
+              setSocketTokens(res.socket_tokens.socket_access_token, res.socket_tokens.socket_refresh_token);
+              set({ socketTokens: res.socket_tokens });
+              persistSession({ socketTokens: res.socket_tokens });
+            }
+          } catch (e: any) {
+            console.warn('[authStore] Initial socket token acquisition error:', e.message);
+          }
+        }
+
         set({
           isLoading: false,
-          socketTokens,
+          isAuthenticated: true,
         });
         return true;
       }
@@ -318,14 +358,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return false;
     } catch (err) {
       const msg = extractErrorMessage(err);
-      if (msg.toLowerCase().includes('not found') || msg.toLowerCase().includes('biometric key')) {
-        set({ isLoading: false, hasBiometric: false, isBiometricEnrolled: false });
+      if (
+        msg.toLowerCase().includes('not found') ||
+        msg.toLowerCase().includes('biometric key') ||
+        msg.toLowerCase().includes('provider') ||
+        msg.toLowerCase().includes('invalidated') ||
+        msg.toLowerCase().includes('missing')
+      ) {
+        set({ isLoading: false, isBiometricEnrolled: false });
       } else {
         set({ isLoading: false, error: msg });
       }
       throw new Error(msg);
     }
   },
+
 
   restoreSession: (session: StoredSession) => {
     if (session?.tokens?.access_token) {
@@ -349,6 +396,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Ignore error on logout
     } finally {
       storageService.removeItem('aura_auth_session');
+      await keychainService.clearTokens();
       setAuthTokens(null, null);
       set({
         user: null,
@@ -367,6 +415,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
     }
   },
+
 
   clearError: () => set({ error: null }),
 }));

@@ -84,13 +84,19 @@ export const biometricsService = {
   },
 
   /**
-   * Prompt biometric authentication dialog, sign userId payload with device private key,
-   * and verify signature on backend to obtain WebSocket tokens.
+   * Prompt biometric authentication dialog, verify via device hardware keystore,
+   * and unlock locally stored secure tokens without blocking on server cold start.
    */
   authenticate: async (
     userId: string,
     promptMessage = 'Confirm fingerprint or Face ID to unlock'
-  ): Promise<SocketTokens | null> => {
+  ): Promise<{ success: boolean; signature?: string }> => {
+    // 1. Verify that hardware keys exist on device before attempting signature
+    const keysExist = await biometricsService.checkKeysExist();
+    if (!keysExist) {
+      throw new Error('Biometric key not found on this device. Please re-enroll.');
+    }
+
     const { success, signature, error } = await rnBiometrics.createSignature({
       promptMessage,
       payload: userId,
@@ -99,14 +105,35 @@ export const biometricsService = {
 
     if (!success || !signature) {
       if (error && error !== 'User cancellation') {
+        if (
+          error.includes('No installed provider supports this key') ||
+          error.includes('(null)') ||
+          error.includes('Key permanently invalidated') ||
+          error.includes('Key not found')
+        ) {
+          await rnBiometrics.deleteKeys().catch(() => {});
+          throw new Error('Biometric key is missing or invalidated on this device. Please re-enroll.');
+        }
         throw new Error(error);
       }
-      return null;
+      return { success: false };
     }
 
-    const res = await userApi.verifyBiometric({ signature });
-    return res.socket_tokens || null;
+    // Fire background verification silently without blocking the user
+    userApi
+      .verifyBiometric({ signature })
+      .then((res) => {
+        if (res?.socket_tokens) {
+          console.log('[Biometrics] Background socket tokens refreshed successfully.');
+        }
+      })
+      .catch((err) => {
+        console.log('[Biometrics] Background sync pending server wake-up:', err.message);
+      });
+
+    return { success: true, signature };
   },
+
 
   /**
    * Delete biometric keys from device keystore/keychain

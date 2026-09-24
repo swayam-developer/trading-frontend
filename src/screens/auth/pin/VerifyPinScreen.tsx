@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, StatusBar, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
@@ -16,6 +16,8 @@ export const VerifyPinScreen: React.FC = () => {
 
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const hasPromptedRef = useRef(false);
+  const isVerifyingRef = useRef(false);
 
   const {
     verifyPin,
@@ -37,6 +39,8 @@ export const VerifyPinScreen: React.FC = () => {
   const biometricIcon = biometryType === 'FaceID' ? 'scan-outline' : 'finger-print-outline';
 
   const triggerBiometricAuth = useCallback(async () => {
+    if (isVerifyingRef.current) return;
+    isVerifyingRef.current = true;
     setError(null);
     try {
       const verified = await verifyBiometrics();
@@ -50,32 +54,45 @@ export const VerifyPinScreen: React.FC = () => {
       }
     } catch (err: any) {
       const msg = err.message || '';
-      if (msg.toLowerCase().includes('not found') || msg.toLowerCase().includes('biometric key')) {
+      if (
+        msg.toLowerCase().includes('not found') ||
+        msg.toLowerCase().includes('biometric key') ||
+        msg.toLowerCase().includes('no installed provider') ||
+        msg.toLowerCase().includes('null') ||
+        msg.toLowerCase().includes('missing') ||
+        msg.toLowerCase().includes('invalidated')
+      ) {
         Toast.show({
           type: 'info',
-          text1: 'Biometrics Not Registered',
-          text2: 'Please enter your 4-digit PIN to unlock.',
+          text1: 'Biometrics Needs Setup on Device',
+          text2: 'Tap "Re-register" below to activate on this device.',
         });
-        setError(null);
+        setError('Biometric key is missing on this device. Please tap below to re-register.');
       } else {
-        setError(msg || 'Biometric verification failed. Please enter your PIN.');
+        setError(msg || 'Biometric verification failed. Please try again.');
       }
+    } finally {
+      isVerifyingRef.current = false;
     }
   }, [verifyBiometrics, navigation]);
 
-  // Auto-prompt biometrics only if THIS account has biometrics enrolled on the backend
+  // Auto-prompt biometrics only once on mount
   useEffect(() => {
+    if (hasPromptedRef.current) return;
+
     const initBiometrics = async () => {
       const { available, enrolled } = await checkBiometrics();
-      if (available && enrolled && hasBiometric) {
+      if (available && enrolled && hasBiometric && !hasPromptedRef.current) {
+        hasPromptedRef.current = true;
         setTimeout(() => {
           triggerBiometricAuth();
-        }, 350);
+        }, 400);
       }
     };
 
     initBiometrics();
   }, [checkBiometrics, hasBiometric, triggerBiometricAuth]);
+
 
   const handleDigitPress = async (digit: string) => {
     setError(null);
@@ -108,6 +125,24 @@ export const VerifyPinScreen: React.FC = () => {
     navigation.replace('EmailCheck');
   };
 
+  const handleReEnrollBiometrics = async () => {
+    try {
+      await enrollBiometrics();
+      Toast.show({
+        type: 'success',
+        text1: `${biometricName} Enrolled`,
+        text2: 'Biometric key is now active on this device.',
+      });
+      navigation.replace('Dashboard');
+    } catch (e: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Enrollment Failed',
+        text2: e.message || 'Could not enroll biometrics.',
+      });
+    }
+  };
+
   // If the user has ONLY Biometrics enrolled and NO PIN:
   if (!hasPin && (isBiometricEnrolled || hasBiometric)) {
     return (
@@ -135,6 +170,25 @@ export const VerifyPinScreen: React.FC = () => {
         </View>
 
         <View style={styles.footer}>
+          {isBiometricsAvailable && (
+            <TouchableOpacity
+              style={styles.bioQuickButton}
+              onPress={handleReEnrollBiometrics}
+              activeOpacity={0.7}
+            >
+              <Icon name="refresh-outline" size={moderateScale(18)} color={Colors.primary} style={{ marginRight: 6 }} />
+              <Text style={styles.bioQuickText}>Re-register {biometricName} on this device</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => navigation.replace('SetPin')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.secondaryButtonText}>Set Up 4-Digit PIN Instead</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.switchButton}
             onPress={handleSwitchAccount}
@@ -146,6 +200,7 @@ export const VerifyPinScreen: React.FC = () => {
       </View>
     );
   }
+
 
   // If user has PIN or BOTH methods:
   return (
@@ -305,6 +360,17 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(13),
     fontWeight: '600',
   },
+  secondaryButton: {
+    alignItems: 'center',
+    paddingVertical: verticalScale(10),
+    paddingHorizontal: scale(16),
+    marginBottom: verticalScale(6),
+  },
+  secondaryButtonText: {
+    color: Colors.textSecondary,
+    fontSize: moderateScale(13),
+    fontWeight: '600',
+  },
   switchButton: {
     alignItems: 'center',
     paddingVertical: verticalScale(8),
@@ -315,3 +381,4 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
+

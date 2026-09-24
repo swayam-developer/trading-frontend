@@ -1,3 +1,15 @@
+export interface CandleData {
+  timeStamp?: string;
+  time?: number | string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  value?: number;
+  price?: number;
+  label?: string;
+}
+
 export interface Stock {
   _id: string;
   symbol: string;
@@ -5,9 +17,29 @@ export interface Stock {
   iconUrl: string;
   lastDayTradedPrice: number;
   currentPrice: number;
-  dayTimeSeries?: Array<{ time?: string; price?: number; value?: number }>;
-  tenMinTimeSeries?: Array<{ time?: string; price?: number; value?: number }>;
+  dayTimeSeries?: CandleData[];
+  tenMinTimeSeries?: CandleData[];
 }
+
+export interface MarketStatusData {
+  isOpen: boolean;
+  isTradingHour: boolean;
+  isHoliday: boolean;
+  isWeekDay: boolean;
+  message: string;
+  holidays: string[];
+  marketHours: {
+    open: string;
+    close: string;
+  };
+  serverTime: string;
+}
+
+export interface MarketStatusResponse {
+  msg: string;
+  data: MarketStatusData;
+}
+
 
 export interface Holding {
   _id: string;

@@ -21,7 +21,10 @@ import { Holding } from '../../services/stock/stock.types';
 import { HoldingCard } from './components/HoldingCard';
 import { PortfolioSummaryCard } from './components/PortfolioSummaryCard';
 import { MainTabNavigationProp } from '../../navigation/types';
-import { getSocketAccessToken } from '../../services/apiClient';
+import { getSocketAccessToken, setSocketTokens } from '../../services/apiClient';
+
+
+
 
 const PIE_COLORS = ['#00E676', '#00E5FF', '#FFD700', '#FF5252', '#9C27B0', '#FF9800', '#00B0FF'];
 
@@ -35,24 +38,30 @@ export const PortfolioScreen: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
-    if (!getSocketAccessToken()) {
+    const socketToken = getSocketAccessToken() || useAuthStore.getState().socketTokens?.socket_access_token;
+    if (socketToken) {
+      if (!getSocketAccessToken()) {
+        const sTokens = useAuthStore.getState().socketTokens;
+        if (sTokens) setSocketTokens(sTokens.socket_access_token, sTokens.socket_refresh_token);
+      }
+      fetchHoldings();
+      fetchStocks();
+      fetchProfile();
+    } else if (!useAuthStore.getState().isAuthenticated) {
       navigation.getParent<any>()?.replace('VerifyPin');
-      return;
+    } else {
+      fetchHoldings();
+      fetchStocks();
+      fetchProfile();
     }
-    fetchHoldings();
-    fetchStocks();
-    fetchProfile();
   }, [fetchHoldings, fetchStocks, fetchProfile, navigation]);
 
   const onRefresh = useCallback(async () => {
-    if (!getSocketAccessToken()) {
-      navigation.getParent<any>()?.replace('VerifyPin');
-      return;
-    }
     setIsRefreshing(true);
     await Promise.allSettled([fetchHoldings(), fetchStocks(), fetchProfile()]);
     setIsRefreshing(false);
-  }, [fetchHoldings, fetchStocks, fetchProfile, navigation]);
+  }, [fetchHoldings, fetchStocks, fetchProfile]);
+
 
   const handleTrade = (holding: Holding) => {
     if (holding.stock) {

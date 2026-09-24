@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { Colors } from '../../theme/colors';
 import { PriceAreaChart } from '../../components/common/PriceAreaChart';
 import { RootNavigationProp, RootRouteProp } from '../../navigation/types';
 import { useStockStore } from '../../store/stock/stockStore';
+import { socketService } from '../../services/socket/socket.service';
 import { TradeModal } from './components/TradeModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -41,13 +42,26 @@ export const StockDetailScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<RootNavigationProp<'StockDetail'>>();
   const route = useRoute<RootRouteProp<'StockDetail'>>();
-  const { stock } = route.params;
+  const { stock: initialStock } = route.params;
 
-  const { holdings } = useStockStore();
+  const { holdings, selectedStock, setSelectedStock, fetchStockDetail } = useStockStore();
   const [selectedTimeframe, setSelectedTimeframe] = useState<TimeFrame>('1D');
   const [tradeModalVisible, setTradeModalVisible] = useState(false);
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
   const [imageError, setImageError] = useState(false);
+
+  // Subscribe to live socket updates and fetch full time series from backend
+  useEffect(() => {
+    setSelectedStock(initialStock);
+    fetchStockDetail(initialStock.symbol);
+    socketService.subscribeToStock(initialStock.symbol);
+
+    return () => {
+      socketService.unsubscribeFromStock(initialStock.symbol);
+    };
+  }, [initialStock.symbol, setSelectedStock, fetchStockDetail]);
+
+  const stock = selectedStock?.symbol === initialStock.symbol ? selectedStock : initialStock;
 
   // Check if authenticated user holds this stock
   const userHolding = useMemo(() => {
@@ -58,12 +72,9 @@ export const StockDetailScreen: React.FC = () => {
     );
   }, [holdings, stock]);
 
-  // Sanitize astronomical numbers if present
-  let currentPrice = typeof stock.currentPrice === 'number' ? stock.currentPrice : parseFloat(stock.currentPrice as any) || 0;
-  let lastDayTradedPrice = typeof stock.lastDayTradedPrice === 'number' ? stock.lastDayTradedPrice : parseFloat(stock.lastDayTradedPrice as any) || currentPrice;
-
-  if (currentPrice > 1000000) currentPrice = 175.43;
-  if (lastDayTradedPrice > 1000000) lastDayTradedPrice = 171.20;
+  // Real prices directly from database
+  const currentPrice = Number(stock.currentPrice || 0);
+  const lastDayTradedPrice = Number(stock.lastDayTradedPrice || currentPrice);
 
   const diff = currentPrice - lastDayTradedPrice;
   const isPositive = diff >= 0;
@@ -73,56 +84,38 @@ export const StockDetailScreen: React.FC = () => {
 
   const brand = BRAND_COLORS[stock.symbol.toUpperCase()] || DEFAULT_BRAND;
 
-  // Generate realistic chart data based on selected timeframe
+  // Render real time series data from backend MongoDB
   const chartData = useMemo(() => {
-    const ltp = lastDayTradedPrice || currentPrice * 0.98;
-    const delta = currentPrice - ltp;
+    const rawSeries =
+      selectedTimeframe === '1D'
+        ? stock.dayTimeSeries
+        : (stock.tenMinTimeSeries && stock.tenMinTimeSeries.length > 0 ? stock.tenMinTimeSeries : stock.dayTimeSeries);
 
-    type Config = { count: number; labels: string[]; volatility: number };
-    const configs: Record<TimeFrame, Config> = {
-      '1D': {
-        count: 10,
-        labels: ['09:30', '10:15', '11:00', '11:45', '12:30', '13:15', '14:00', '14:45', '15:30', '16:00'],
-        volatility: 0.25,
-      },
-      '1W': {
-        count: 7,
-        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-        volatility: 0.45,
-      },
-      '1M': {
-        count: 10,
-        labels: ['W1', 'W1', 'W2', 'W2', 'W3', 'W3', 'W4', 'W4', 'W5', 'Today'],
-        volatility: 0.65,
-      },
-      '1Y': {
-        count: 12,
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-        volatility: 0.9,
-      },
-      'ALL': {
-        count: 12,
-        labels: ['2021', '2021', '2022', '2022', '2023', '2023', '2024', '2024', '2025', '2025', '2026', 'Now'],
-        volatility: 1.2,
-      },
-    };
-
-    const cfg = configs[selectedTimeframe] || configs['1D'];
-    const data = [];
-    const basePrice = selectedTimeframe === '1D' ? ltp : currentPrice * (1 - (cfg.volatility * (isPositive ? 0.08 : -0.06)));
-    const totalDiff = currentPrice - basePrice;
-
-    for (let i = 0; i < cfg.count; i++) {
-      const progress = i / (cfg.count - 1);
-      const wave = Math.sin((i + 1) * 1.8) * (Math.abs(totalDiff) * 0.35 + currentPrice * 0.012);
-      const val = basePrice + totalDiff * progress + (i === 0 || i === cfg.count - 1 ? 0 : wave);
-      data.push({
-        value: parseFloat(Math.max(1, val).toFixed(2)),
-        label: cfg.labels[i] || '',
+    if (rawSeries && Array.isArray(rawSeries) && rawSeries.length > 1) {
+      const step = Math.max(1, Math.floor(rawSeries.length / 6));
+      return rawSeries.map((pt: any, index: number) => {
+        let label = '';
+        if (pt.timeStamp) {
+          try {
+            const d = new Date(pt.timeStamp);
+            label = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+          } catch {}
+        }
+        return {
+          value: Number(pt.close ?? pt.price ?? pt.value ?? currentPrice),
+          label: index % step === 0 ? label : '',
+        };
       });
     }
-    return data;
-  }, [currentPrice, lastDayTradedPrice, selectedTimeframe, isPositive]);
+
+    // Default 2-point baseline if market just opened with 1 data point
+    const ltp = lastDayTradedPrice || currentPrice;
+    return [
+      { value: ltp, label: 'Prev Close' },
+      { value: currentPrice, label: 'Current' },
+    ];
+  }, [stock.dayTimeSeries, stock.tenMinTimeSeries, selectedTimeframe, currentPrice, lastDayTradedPrice]);
+
 
   const openTrade = (type: 'buy' | 'sell') => {
     setTradeType(type);

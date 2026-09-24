@@ -1,6 +1,7 @@
 import { apiClient } from '../apiClient';
 import {
   Stock,
+
   Holding,
   Order,
   GetAllStocksResponse,
@@ -13,9 +14,19 @@ import {
   GetOrdersResponse,
   RegisterStockRequest,
   RegisterStockResponse,
+  MarketStatusResponse,
+  MarketStatusData,
 } from './stock.types';
 
 export const stockApi = {
+  /**
+   * Fetch live market trading hours, holiday calendar and status from backend
+   */
+  getMarketStatus: async (): Promise<MarketStatusData> => {
+    const response = await apiClient.get<MarketStatusResponse>('/stocks/market-status');
+    return response.data.data;
+  },
+
   /**
    * Fetch all registered stocks with current and last day traded prices
    */
@@ -23,6 +34,7 @@ export const stockApi = {
     const response = await apiClient.get<GetAllStocksResponse>('/stocks');
     return response.data.data || [];
   },
+
 
   /**
    * Fetch a single stock by its symbol (e.g. AAPL)

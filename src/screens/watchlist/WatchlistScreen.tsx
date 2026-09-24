@@ -16,39 +16,64 @@ import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../theme/colors';
 import { useStockStore } from '../../store/stock/stockStore';
+import { useAuthStore } from '../../store/auth/authStore';
 import { Stock } from '../../services/stock/stock.types';
 import { StockCard } from './components/StockCard';
 import { RootNavigationProp } from '../../navigation/types';
-import { getSocketAccessToken } from '../../services/apiClient';
+import { getSocketAccessToken, setSocketTokens } from '../../services/apiClient';
+
+
+import { socketService } from '../../services/socket/socket.service';
 
 type FilterType = 'all' | 'gainers' | 'losers';
 
 export const WatchlistScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<RootNavigationProp<'MainTabs'>>();
-  const { stocks, isLoadingStocks, fetchStocks, setSelectedStock } = useStockStore();
+  const {
+    stocks,
+    isLoadingStocks,
+    fetchStocks,
+    setSelectedStock,
+    initSocket,
+    isSocketConnected,
+    marketStatus,
+  } = useStockStore();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
-    if (!getSocketAccessToken()) {
-      navigation.replace('VerifyPin');
-      return;
+    // 1. Initialize socket connection
+    initSocket();
+
+    // 2. Fetch initial stocks
+    const load = async () => {
+      const data = await fetchStocks();
+      if (data && data.length > 0) {
+        // 3. Subscribe to real-time updates for all stock symbols
+        socketService.subscribeToMultipleStocks(data.map((s) => s.symbol));
+      }
+    };
+    load();
+  }, [fetchStocks, initSocket]);
+
+  // Subscribe whenever stocks list updates
+  useEffect(() => {
+    if (stocks.length > 0) {
+      socketService.subscribeToMultipleStocks(stocks.map((s) => s.symbol));
     }
-    fetchStocks();
-  }, [fetchStocks, navigation]);
+  }, [stocks.length]);
 
   const onRefresh = useCallback(async () => {
-    if (!getSocketAccessToken()) {
-      navigation.replace('VerifyPin');
-      return;
-    }
     setIsRefreshing(true);
-    await fetchStocks();
+    const data = await fetchStocks();
+    if (data && data.length > 0) {
+      socketService.subscribeToMultipleStocks(data.map((s) => s.symbol));
+    }
     setIsRefreshing(false);
-  }, [fetchStocks, navigation]);
+  }, [fetchStocks]);
 
   const handleStockPress = (stock: Stock) => {
     setSelectedStock(stock);
@@ -79,6 +104,10 @@ export const WatchlistScreen: React.FC = () => {
     [stocks]
   );
 
+  const isLive = !!marketStatus?.isOpen;
+  const statusLabel = marketStatus?.message?.toUpperCase() || (isLive ? 'MARKETS OPEN' : 'MARKET CLOSED');
+
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" />
@@ -90,11 +119,29 @@ export const WatchlistScreen: React.FC = () => {
           <Text style={styles.headerTitle}>Watchlist</Text>
         </View>
 
-        <View style={styles.marketStatusBadge}>
-          <View style={styles.liveIndicator} />
-          <Text style={styles.marketStatusText}>MARKETS OPEN</Text>
+        <View
+          style={[
+            styles.marketStatusBadge,
+            !isLive && { backgroundColor: 'rgba(255, 171, 0, 0.1)', borderColor: 'rgba(255, 171, 0, 0.25)' },
+          ]}
+        >
+          <View
+            style={[
+              styles.liveIndicator,
+              !isLive && { backgroundColor: '#FFAB00', shadowColor: '#FFAB00' },
+            ]}
+          />
+          <Text
+            style={[
+              styles.marketStatusText,
+              !isLive && { color: '#FFAB00' },
+            ]}
+          >
+            {statusLabel}
+          </Text>
         </View>
       </View>
+
 
       {/* Market Indices Ticker */}
       <View style={styles.tickerContainer}>
