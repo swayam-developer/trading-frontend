@@ -1,80 +1,135 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Animated,
+} from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 import { Stock } from '../../../services/stock/stock.types';
 import { Colors } from '../../../theme/colors';
+import { StockAvatar } from '../../../components/common/StockAvatar';
+import { MiniSparkline } from '../../../components/common/MiniSparkline';
 
 interface StockCardProps {
   stock: Stock;
   onPress: () => void;
+  pillDisplayMode?: 'percent' | 'dollar';
+  onTogglePillMode?: () => void;
 }
 
-// Branded color palettes for top securities
-const BRAND_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  AAPL: { bg: '#1E293B', text: '#E2E8F0', border: '#334155' },
-  MSFT: { bg: 'rgba(0, 164, 239, 0.15)', text: '#00A4EF', border: 'rgba(0, 164, 239, 0.35)' },
-  GOOGL: { bg: 'rgba(234, 67, 53, 0.15)', text: '#EA4335', border: 'rgba(234, 67, 53, 0.35)' },
-  AMZN: { bg: 'rgba(255, 153, 0, 0.15)', text: '#FF9900', border: 'rgba(255, 153, 0, 0.35)' },
-  TSLA: { bg: 'rgba(232, 33, 39, 0.15)', text: '#E82127', border: 'rgba(232, 33, 39, 0.35)' },
-  META: { bg: 'rgba(6, 104, 225, 0.15)', text: '#0668E1', border: 'rgba(6, 104, 225, 0.35)' },
-  NVDA: { bg: 'rgba(118, 185, 0, 0.15)', text: '#76B900', border: 'rgba(118, 185, 0, 0.35)' },
-  NFLX: { bg: 'rgba(229, 9, 20, 0.15)', text: '#E50914', border: 'rgba(229, 9, 20, 0.35)' },
-  DIS: { bg: 'rgba(17, 60, 207, 0.15)', text: '#3B82F6', border: 'rgba(17, 60, 207, 0.35)' },
-  JPM: { bg: 'rgba(16, 185, 129, 0.15)', text: '#10B981', border: 'rgba(16, 185, 129, 0.35)' },
-  V: { bg: 'rgba(245, 158, 11, 0.15)', text: '#F59E0B', border: 'rgba(245, 158, 11, 0.35)' },
-};
+export const StockCard: React.FC<StockCardProps> = ({
+  stock,
+  onPress,
+  pillDisplayMode = 'percent',
+  onTogglePillMode,
+}) => {
+  const [internalMode, setInternalMode] = useState<'percent' | 'dollar'>('percent');
+  const activeMode = onTogglePillMode ? pillDisplayMode : internalMode;
 
-const DEFAULT_BRAND = { bg: 'rgba(0, 230, 118, 0.12)', text: '#00E676', border: 'rgba(0, 230, 118, 0.3)' };
+  // Flash animation on live price tick
+  const flashAnim = useRef(new Animated.Value(0)).current;
+  const prevPriceRef = useRef<number>(stock.currentPrice);
 
-export const StockCard: React.FC<StockCardProps> = ({ stock, onPress }) => {
-  const [imageFailed, setImageFailed] = useState(false);
-
-  // Sanitize astronomical/corrupted prices from previous backend cron
-  let currentPrice = typeof stock.currentPrice === 'number' ? stock.currentPrice : parseFloat(stock.currentPrice as any) || 0;
-  let lastDayTradedPrice = typeof stock.lastDayTradedPrice === 'number' ? stock.lastDayTradedPrice : parseFloat(stock.lastDayTradedPrice as any) || currentPrice;
+  // Sanitize astronomical/corrupted prices from legacy cron data
+  let currentPrice =
+    typeof stock.currentPrice === 'number'
+      ? stock.currentPrice
+      : parseFloat(stock.currentPrice as any) || 0;
+  let lastDayTradedPrice =
+    typeof stock.lastDayTradedPrice === 'number'
+      ? stock.lastDayTradedPrice
+      : parseFloat(stock.lastDayTradedPrice as any) || currentPrice;
 
   if (currentPrice > 1000000) currentPrice = 175.43;
-  if (lastDayTradedPrice > 1000000) lastDayTradedPrice = 171.20;
+  if (lastDayTradedPrice > 1000000) lastDayTradedPrice = 171.2;
 
   const diff = currentPrice - lastDayTradedPrice;
   const isPositive = diff >= 0;
-  const percentChange = lastDayTradedPrice > 0
-    ? ((diff / lastDayTradedPrice) * 100).toFixed(2)
-    : '0.00';
+  const percentChange =
+    lastDayTradedPrice > 0
+      ? ((diff / lastDayTradedPrice) * 100).toFixed(2)
+      : '0.00';
 
-  const brand = BRAND_COLORS[stock.symbol.toUpperCase()] || DEFAULT_BRAND;
+  // Trigger flash on real-time price tick update
+  useEffect(() => {
+    if (prevPriceRef.current !== currentPrice) {
+      prevPriceRef.current = currentPrice;
+      Animated.sequence([
+        Animated.timing(flashAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+        Animated.timing(flashAnim, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: false,
+        }),
+      ]).start();
+    }
+  }, [currentPrice, flashAnim]);
+
+  // Extract sparkline points from dayTimeSeries if available
+  const sparklineData = React.useMemo(() => {
+    if (stock.dayTimeSeries && stock.dayTimeSeries.length >= 2) {
+      return stock.dayTimeSeries
+        .map((pt) => (typeof pt === 'number' ? pt : pt?.value || 0))
+        .filter((v) => v > 0 && v < 1000000);
+    }
+    return undefined;
+  }, [stock.dayTimeSeries]);
+
+  // Exchange tag based on symbol
+  const exchange = React.useMemo(() => {
+    const sym = stock.symbol.toUpperCase();
+    if (['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX'].includes(sym)) {
+      return 'NASDAQ';
+    }
+    return 'NYSE';
+  }, [stock.symbol]);
+
+  const handlePillPress = () => {
+    if (onTogglePillMode) {
+      onTogglePillMode();
+    } else {
+      setInternalMode((prev) => (prev === 'percent' ? 'dollar' : 'percent'));
+    }
+  };
+
+  const flashBgColor = flashAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [
+      'transparent',
+      isPositive ? 'rgba(0, 230, 118, 0.25)' : 'rgba(255, 82, 82, 0.25)',
+    ],
+  });
 
   return (
     <TouchableOpacity
       style={styles.card}
       onPress={onPress}
-      activeOpacity={0.75}
+      activeOpacity={0.72}
     >
-      {/* Left: Branded Logo / Monogram Avatar */}
-      <View style={[styles.avatarBox, { backgroundColor: brand.bg, borderColor: brand.border }]}>
-        {!imageFailed && stock.iconUrl && stock.iconUrl.startsWith('http') ? (
-          <Image
-            source={{ uri: stock.iconUrl }}
-            style={styles.avatarImage}
-            resizeMode="contain"
-            onError={() => setImageFailed(true)}
-          />
-        ) : (
-          <Text style={[styles.avatarText, { color: brand.text }]}>
-            {stock.symbol.slice(0, 3).toUpperCase()}
-          </Text>
-        )}
-      </View>
+      {/* Left: Real High-Res Branded Stock Avatar */}
+      <StockAvatar
+        symbol={stock.symbol}
+        iconUrl={stock.iconUrl}
+        size={scale(44)}
+        borderRadius={scale(14)}
+        style={styles.avatarSpacing}
+      />
 
-      {/* Middle: Stock Symbol & Company Name */}
+      {/* Symbol & Info Column */}
       <View style={styles.symbolInfo}>
         <View style={styles.symbolRow}>
           <Text style={styles.symbolText} numberOfLines={1}>
             {stock.symbol}
           </Text>
-          <View style={styles.eqBadge}>
-            <Text style={styles.eqText}>EQ</Text>
+          <View style={styles.exchangeBadge}>
+            <Text style={styles.exchangeText}>{exchange}</Text>
           </View>
         </View>
 
@@ -83,34 +138,57 @@ export const StockCard: React.FC<StockCardProps> = ({ stock, onPress }) => {
         </Text>
       </View>
 
-      {/* Right: Clean Price & 24h Change Pill */}
-      <View style={styles.priceColumn}>
-        <Text style={styles.priceValue} numberOfLines={1}>
-          ${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </Text>
+      {/* Center: Monotone SVG Sparkline */}
+      <View style={styles.sparklineContainer}>
+        <MiniSparkline
+          data={sparklineData}
+          isPositive={isPositive}
+          width={scale(56)}
+          height={verticalScale(24)}
+          strokeWidth={1.7}
+        />
+      </View>
 
-        <View
-          style={[
-            styles.changeBadge,
-            isPositive ? styles.changeBadgeUp : styles.changeBadgeDown,
-          ]}
+      {/* Right: Live Tabular Price & Tappable Change Pill */}
+      <View style={styles.priceColumn}>
+        <Animated.View style={[styles.priceFlashWrap, { backgroundColor: flashBgColor }]}>
+          <Text style={styles.priceValue} numberOfLines={1}>
+            ${currentPrice.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
+          </Text>
+        </Animated.View>
+
+        <TouchableOpacity
+          onPress={handlePillPress}
+          activeOpacity={0.7}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
-          <Icon
-            name={isPositive ? 'caret-up' : 'caret-down'}
-            size={moderateScale(10)}
-            color={isPositive ? Colors.primary : Colors.error}
-            style={styles.caret}
-          />
-          <Text
+          <View
             style={[
-              styles.changePercentText,
-              { color: isPositive ? Colors.primary : Colors.error },
+              styles.changeBadge,
+              isPositive ? styles.changeBadgeUp : styles.changeBadgeDown,
             ]}
           >
-            {isPositive ? '+' : ''}
-            {percentChange}%
-          </Text>
-        </View>
+            <Icon
+              name={isPositive ? 'caret-up' : 'caret-down'}
+              size={moderateScale(9)}
+              color={isPositive ? Colors.primary : Colors.error}
+              style={styles.caret}
+            />
+            <Text
+              style={[
+                styles.changePercentText,
+                { color: isPositive ? Colors.primary : Colors.error },
+              ]}
+            >
+              {activeMode === 'percent'
+                ? `${isPositive ? '+' : ''}${percentChange}%`
+                : `${isPositive ? '+' : '-'}$${Math.abs(diff).toFixed(2)}`}
+            </Text>
+          </View>
+        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
@@ -123,35 +201,23 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.card,
     borderRadius: moderateScale(16),
     paddingHorizontal: scale(14),
-    paddingVertical: verticalScale(14),
+    paddingVertical: verticalScale(13),
     marginBottom: verticalScale(10),
     borderWidth: 1,
     borderColor: Colors.cardBorder,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3.84,
+    elevation: 2,
   },
-  avatarBox: {
-    width: scale(44),
-    height: scale(44),
-    borderRadius: scale(14),
-    alignItems: 'center',
-    justifyContent: 'center',
+  avatarSpacing: {
     marginRight: scale(12),
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  avatarImage: {
-    width: scale(30),
-    height: scale(30),
-    borderRadius: scale(6),
-  },
-  avatarText: {
-    fontWeight: '900',
-    fontSize: moderateScale(13),
-    letterSpacing: 0.5,
   },
   symbolInfo: {
-    flex: 1,
+    flex: 1.2,
     justifyContent: 'center',
-    marginRight: scale(10),
+    marginRight: scale(6),
   },
   symbolRow: {
     flexDirection: 'row',
@@ -161,37 +227,50 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: moderateScale(16),
     fontWeight: '800',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
-  eqBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  exchangeBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
     paddingHorizontal: scale(5),
     paddingVertical: verticalScale(1),
     borderRadius: moderateScale(4),
     marginLeft: scale(6),
   },
-  eqText: {
+  exchangeText: {
     color: Colors.textMuted,
-    fontSize: moderateScale(9),
+    fontSize: moderateScale(8.5),
     fontWeight: '700',
+    letterSpacing: 0.3,
   },
   companyText: {
     color: Colors.textMuted,
-    fontSize: moderateScale(12),
-    marginTop: verticalScale(3),
+    fontSize: moderateScale(11),
+    marginTop: verticalScale(2),
     fontWeight: '500',
+  },
+  sparklineContainer: {
+    width: scale(58),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: scale(4),
   },
   priceColumn: {
     alignItems: 'flex-end',
     justifyContent: 'center',
     flexShrink: 0,
-    minWidth: scale(90),
+    minWidth: scale(88),
+  },
+  priceFlashWrap: {
+    borderRadius: moderateScale(4),
+    paddingHorizontal: scale(3),
+    paddingVertical: verticalScale(1),
   },
   priceValue: {
     color: Colors.textPrimary,
-    fontSize: moderateScale(16),
+    fontSize: moderateScale(15),
     fontWeight: '800',
     letterSpacing: 0.2,
+    fontVariant: ['tabular-nums'],
   },
   changeBadge: {
     flexDirection: 'row',
@@ -199,7 +278,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: scale(7),
     paddingVertical: verticalScale(3),
     borderRadius: moderateScale(6),
-    marginTop: verticalScale(4),
+    marginTop: verticalScale(3),
   },
   changeBadgeUp: {
     backgroundColor: 'rgba(0, 230, 118, 0.12)',
@@ -213,5 +292,6 @@ const styles = StyleSheet.create({
   changePercentText: {
     fontSize: moderateScale(11),
     fontWeight: '800',
+    fontVariant: ['tabular-nums'],
   },
 });

@@ -3,6 +3,7 @@ import { StockState } from './stockStore.types';
 import { stockApi } from '../../services/stock/stock.api';
 import { useAuthStore } from '../auth/authStore';
 import { socketService } from '../../services/socket/socket.service';
+import { marketAlertService } from '../../services/marketAlert/marketAlert.service';
 
 const extractErrorMessage = (error: unknown): string => {
   if (error && typeof error === 'object') {
@@ -72,6 +73,10 @@ export const useStockStore = create<StockState>((set, get) => ({
     socketService.onStockUpdate((stock) => {
       get().updateLiveStock(stock);
     });
+    socketService.onMarketStatus((status) => {
+      set({ marketStatus: status });
+      marketAlertService.showMarketAlert(status);
+    });
     socketService.onStatusChange((connected) => {
       if (connected) {
         get().fetchMarketStatus();
@@ -118,6 +123,7 @@ export const useStockStore = create<StockState>((set, get) => ({
       if (status) {
         socketService.setMarketStatus(status);
         set({ marketStatus: status });
+        marketAlertService.showMarketAlert(status);
       }
       return status || null;
     } catch (err) {

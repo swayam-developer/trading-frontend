@@ -21,18 +21,48 @@ export interface Stock {
   tenMinTimeSeries?: CandleData[];
 }
 
+export interface HolidayItem {
+  date: string;
+  name: string;
+}
+
+export interface MarketClosureSpan {
+  from: string;
+  to: string;
+  reason: string;
+  totalDays: number;
+  daysUntil: number;
+  holidayName?: string;
+}
+
+export interface MarketAlertPayload {
+  type: 'open' | 'closed' | 'holiday_today' | 'closed_tomorrow' | 'upcoming_closure';
+  title: string;
+  message: string;
+  dateRange?: string;
+}
+
 export interface MarketStatusData {
   isOpen: boolean;
   isTradingHour: boolean;
   isHoliday: boolean;
   isWeekDay: boolean;
   message: string;
+  todayHoliday?: HolidayItem | null;
+  isTomorrowClosed?: boolean;
+  tomorrowReason?: string | null;
+  nextOpenTime?: string | null;
+  nextOpenFormatted?: string;
+  upcomingClosures?: MarketClosureSpan[];
   holidays: string[];
+  holidayCalendar?: HolidayItem[];
   marketHours: {
     open: string;
     close: string;
+    timezone?: string;
   };
   serverTime: string;
+  alert?: MarketAlertPayload;
 }
 
 export interface MarketStatusResponse {
@@ -60,6 +90,9 @@ export interface Order {
   quantity: number;
   price: number;
   type: 'buy' | 'sell';
+  status?: 'EXECUTED' | 'PENDING_AMO' | 'CANCELLED';
+  isAMO?: boolean;
+  executedAt?: string;
   timestamp: string;
   remainingBalance: number;
 }

@@ -15,6 +15,19 @@ interface PinKeypadProps {
   biometryType?: string | null;
 }
 
+const KEYPAD_LETTERS: Record<string, string> = {
+  '1': '',
+  '2': 'ABC',
+  '3': 'DEF',
+  '4': 'GHI',
+  '5': 'JKL',
+  '6': 'MNO',
+  '7': 'PQRS',
+  '8': 'TUV',
+  '9': 'WXYZ',
+  '0': '+',
+};
+
 export const PinKeypad: React.FC<PinKeypadProps> = ({
   pin,
   maxDigits = 4,
@@ -41,19 +54,27 @@ export const PinKeypad: React.FC<PinKeypadProps> = ({
                 isFilled && styles.dotFilled,
                 !!error && styles.dotError,
               ]}
-            />
+            >
+              {isFilled && <View style={styles.dotInnerCore} />}
+            </View>
           );
         })}
       </View>
 
-      {!!error && <Text style={styles.errorText}>{error}</Text>}
+      {/* Error Message with Warning Icon */}
+      {!!error && (
+        <View style={styles.errorContainer}>
+          <Icon name="alert-circle" size={moderateScale(14)} color={Colors.error} style={{ marginRight: 5 }} />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
 
       {/* Numeric Keypad Grid */}
       <View style={styles.keypadGrid}>
         {digits.map((digit, index) => {
           if (digit === '') {
             if (showBiometricButton && onBiometricPress) {
-              const iconName = biometryType === 'FaceID' ? 'scan-outline' : 'finger-print';
+              const iconName = biometryType === 'FaceID' ? 'scan-outline' : 'finger-print-outline';
               return (
                 <TouchableOpacity
                   key={index}
@@ -69,11 +90,15 @@ export const PinKeypad: React.FC<PinKeypadProps> = ({
           }
 
           const isDelete = digit === '⌫';
+          const letters = KEYPAD_LETTERS[digit] || '';
 
           return (
             <TouchableOpacity
               key={index}
-              style={[styles.key, isDelete && styles.deleteKey]}
+              style={[
+                styles.key,
+                isDelete ? styles.deleteKey : styles.numberKey,
+              ]}
               onPress={() => {
                 if (isDelete) {
                   onDeletePress();
@@ -81,11 +106,16 @@ export const PinKeypad: React.FC<PinKeypadProps> = ({
                   onDigitPress(digit);
                 }
               }}
-              activeOpacity={0.6}
+              activeOpacity={0.65}
             >
-              <Text style={[styles.keyText, isDelete && styles.deleteKeyText]}>
-                {digit}
-              </Text>
+              {isDelete ? (
+                <Icon name="backspace-outline" size={moderateScale(24)} color={Colors.textSecondary} />
+              ) : (
+                <View style={styles.numberKeyContent}>
+                  <Text style={styles.keyDigitText}>{digit}</Text>
+                  {letters ? <Text style={styles.keyLetterText}>{letters}</Text> : <View style={styles.keyLetterSpacer} />}
+                </View>
+              )}
             </TouchableOpacity>
           );
         })}
@@ -98,25 +128,27 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     width: '100%',
-    paddingVertical: verticalScale(16),
+    paddingVertical: verticalScale(10),
   },
   dotsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginVertical: verticalScale(20),
+    marginVertical: verticalScale(16),
   },
   dot: {
-    width: scale(16),
-    height: scale(16),
-    borderRadius: scale(8),
+    width: scale(18),
+    height: scale(18),
+    borderRadius: scale(9),
     borderWidth: 1.5,
     borderColor: Colors.cardBorder,
-    backgroundColor: 'transparent',
-    marginHorizontal: scale(12),
+    backgroundColor: Colors.inputBackground,
+    marginHorizontal: scale(10),
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dotFilled: {
-    backgroundColor: Colors.primary,
+    backgroundColor: 'rgba(0, 230, 118, 0.15)',
     borderColor: Colors.primary,
     shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 0 },
@@ -124,53 +156,95 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 8,
   },
+  dotInnerCore: {
+    width: scale(8),
+    height: scale(8),
+    borderRadius: scale(4),
+    backgroundColor: Colors.primary,
+  },
   dotError: {
     borderColor: Colors.error,
-    backgroundColor: Colors.error,
+    backgroundColor: 'rgba(255, 82, 82, 0.15)',
+    shadowColor: Colors.error,
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: verticalScale(10),
+    paddingHorizontal: scale(16),
+    paddingVertical: verticalScale(4),
+    backgroundColor: 'rgba(255, 82, 82, 0.08)',
+    borderRadius: moderateScale(12),
+    borderWidth: 1,
+    borderColor: 'rgba(255, 82, 82, 0.2)',
   },
   errorText: {
     color: Colors.error,
     fontSize: moderateScale(12),
-    marginBottom: verticalScale(10),
+    fontWeight: '500',
   },
   keypadGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    width: scale(280),
-    marginTop: verticalScale(10),
+    width: scale(290),
+    marginTop: verticalScale(6),
   },
   key: {
     width: scale(72),
     height: scale(72),
     borderRadius: scale(36),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: scale(10),
+    marginVertical: verticalScale(7),
+  },
+  numberKey: {
     backgroundColor: Colors.card,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  numberKeyContent: {
     alignItems: 'center',
     justifyContent: 'center',
-    margin: scale(10),
+  },
+  keyDigitText: {
+    color: Colors.textPrimary,
+    fontSize: moderateScale(22),
+    fontWeight: '700',
+    lineHeight: moderateScale(26),
+  },
+  keyLetterText: {
+    color: Colors.textMuted,
+    fontSize: moderateScale(9),
+    fontWeight: '600',
+    letterSpacing: 1.5,
+    marginTop: -verticalScale(1),
+  },
+  keyLetterSpacer: {
+    height: verticalScale(10),
   },
   emptyKey: {
     width: scale(72),
     height: scale(72),
-    margin: scale(10),
+    marginHorizontal: scale(10),
+    marginVertical: verticalScale(7),
   },
   biometricKey: {
-    backgroundColor: 'rgba(0, 229, 155, 0.08)',
-    borderColor: 'rgba(0, 229, 155, 0.25)',
+    backgroundColor: 'rgba(0, 230, 118, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 230, 118, 0.3)',
   },
   deleteKey: {
     backgroundColor: 'transparent',
-    borderColor: 'transparent',
-  },
-  keyText: {
-    color: Colors.textPrimary,
-    fontSize: moderateScale(24),
-    fontWeight: '600',
-  },
-  deleteKeyText: {
-    color: Colors.textSecondary,
-    fontSize: moderateScale(22),
+    borderWidth: 0,
   },
 });

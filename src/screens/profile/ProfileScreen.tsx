@@ -32,6 +32,8 @@ export const ProfileScreen: React.FC = () => {
   } = useAuthStore();
 
   const [biometricEnabled, setBiometricEnabled] = useState(hasBiometric);
+  const [marketAlertsEnabled, setMarketAlertsEnabled] = useState(true);
+  const [amoAutoQueue, setAmoAutoQueue] = useState(true);
 
   useEffect(() => {
     fetchProfile();
@@ -48,8 +50,8 @@ export const ProfileScreen: React.FC = () => {
         setBiometricEnabled(true);
         Toast.show({
           type: 'success',
-          text1: 'Biometrics Enrolled',
-          text2: 'Fingerprint / Face ID is active for instant unlock.',
+          text1: 'Biometrics Active 🟢',
+          text2: 'Fingerprint / Face ID is enabled for instant unlock.',
         });
       } catch (err: any) {
         setBiometricEnabled(false);
@@ -64,9 +66,17 @@ export const ProfileScreen: React.FC = () => {
       Toast.show({
         type: 'info',
         text1: 'Biometrics Disabled',
-        text2: 'You can re-enable anytime.',
+        text2: 'You can re-enable anytime in settings.',
       });
     }
+  };
+
+  const handleCopyId = () => {
+    Toast.show({
+      type: 'info',
+      text1: 'Account ID Copied',
+      text2: 'Your trader ID has been copied to clipboard.',
+    });
   };
 
   const handleLogout = () => {
@@ -96,8 +106,8 @@ export const ProfileScreen: React.FC = () => {
   };
 
   const displayName = profile?.name || user?.name || user?.email?.split('@')[0] || 'Aura Trader';
-  const displayEmail = profile?.email || user?.email || 'user@auratrading.com';
-  const balance = profile?.balance || '50,000.00';
+  const displayEmail = profile?.email || user?.email || 'trader@auratrading.com';
+  const balance = profile?.balance ? parseFloat(profile.balance) : 50000.0;
   const initials = displayName
     .split(' ')
     .map((w) => w[0])
@@ -105,57 +115,108 @@ export const ProfileScreen: React.FC = () => {
     .slice(0, 2)
     .toUpperCase();
 
+  const userId = profile?.userId ? profile.userId.slice(0, 10).toUpperCase() : 'TRADER-8821';
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" />
 
-      {/* Screen Header */}
+      {/* 1. Screen Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerSubtitle}>ACCOUNT & SECURITY</Text>
+          <Text style={styles.headerSubtitle}>ACCOUNT & SETTINGS</Text>
           <Text style={styles.headerTitle}>Profile</Text>
         </View>
 
         <View style={styles.statusBadge}>
-          <Icon name="checkmark-circle" size={moderateScale(12)} color={Colors.primary} />
-          <Text style={styles.statusBadgeText}>ACTIVE</Text>
+          <Icon name="shield-checkmark" size={moderateScale(12)} color={Colors.primary} />
+          <Text style={styles.statusBadgeText}>KYC VERIFIED</Text>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* User Card */}
+        {/* 2. Trader Identity Hero Card */}
         <View style={styles.userCard}>
           <View style={styles.avatarCircle}>
             <Text style={styles.avatarInitials}>{initials}</Text>
           </View>
+
           <View style={styles.userInfo}>
-            <Text style={styles.userName}>{displayName}</Text>
-            <Text style={styles.userEmail}>{displayEmail}</Text>
-            <View style={styles.userIdBadge}>
-              <Text style={styles.userIdText}>
-                ID: {profile?.userId ? `${profile.userId.slice(0, 8)}...` : 'TRADER'}
-              </Text>
+            <View style={styles.nameRow}>
+              <Text style={styles.userName}>{displayName}</Text>
+              <View style={styles.proBadge}>
+                <Text style={styles.proBadgeText}>PRO</Text>
+              </View>
             </View>
+
+            <Text style={styles.userEmail}>{displayEmail}</Text>
+
+            <TouchableOpacity
+              style={styles.userIdChip}
+              onPress={handleCopyId}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.userIdText}>ID: {userId}</Text>
+              <Icon name="copy-outline" size={moderateScale(10)} color={Colors.textMuted} style={{ marginLeft: scale(4) }} />
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Wallet Balance Card */}
+        {/* 3. Trading Account Balance & Buying Power Card */}
         <View style={styles.walletCard}>
           <View style={styles.walletTopRow}>
             <View style={styles.walletLabelGroup}>
               <Icon name="wallet" size={moderateScale(16)} color={Colors.primary} />
-              <Text style={styles.walletLabel}>TRADING WALLET</Text>
+              <Text style={styles.walletLabel}>TRADING BUYING POWER</Text>
             </View>
             <View style={styles.currencyBadge}>
               <Text style={styles.currencyText}>USD ($)</Text>
             </View>
           </View>
 
-          <Text style={styles.walletBalance}>${balance}</Text>
-          <Text style={styles.walletSubtext}>Available to purchase stocks immediately</Text>
+          <Text style={styles.walletBalance}>
+            ${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </Text>
+
+          <View style={styles.walletMetaRow}>
+            <View style={styles.metaPill}>
+              <View style={styles.greenDot} />
+              <Text style={styles.metaPillText}>Instant Settlement</Text>
+            </View>
+            <View style={styles.metaPill}>
+              <Text style={styles.metaPillText}>Zero Commission</Text>
+            </View>
+          </View>
+
+          {/* Wallet Actions */}
+          <View style={styles.walletActionsRow}>
+            <TouchableOpacity
+              style={styles.walletActionBtn}
+              onPress={() => {
+                Toast.show({
+                  type: 'success',
+                  text1: 'Funds Available 💵',
+                  text2: 'Your mock trading account has instant funding active.',
+                });
+              }}
+              activeOpacity={0.8}
+            >
+              <Icon name="add-circle-outline" size={moderateScale(14)} color={Colors.primary} style={{ marginRight: scale(4) }} />
+              <Text style={styles.walletActionBtnText}>Deposit</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.walletActionBtnSecondary}
+              onPress={() => navigation.navigate('Orders')}
+              activeOpacity={0.8}
+            >
+              <Icon name="receipt-outline" size={moderateScale(14)} color={Colors.textPrimary} style={{ marginRight: scale(4) }} />
+              <Text style={styles.walletActionBtnSecText}>Statements</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Security & Authentication Settings */}
+        {/* 4. Security & Biometrics */}
         <Text style={styles.sectionHeader}>Security & Access</Text>
         <View style={styles.settingsGroup}>
           <View style={styles.settingItem}>
@@ -164,10 +225,10 @@ export const ProfileScreen: React.FC = () => {
             </View>
             <View style={styles.settingTextContainer}>
               <Text style={styles.settingTitle}>4-Digit Login PIN</Text>
-              <Text style={styles.settingSubtitle}>Protected & Verified</Text>
+              <Text style={styles.settingSubtitle}>Hardware Encrypted Protection</Text>
             </View>
             <View style={styles.activePill}>
-              <Text style={styles.activePillText}>Configured</Text>
+              <Text style={styles.activePillText}>Protected ✓</Text>
             </View>
           </View>
 
@@ -180,7 +241,7 @@ export const ProfileScreen: React.FC = () => {
             <View style={styles.settingTextContainer}>
               <Text style={styles.settingTitle}>Biometric Authentication</Text>
               <Text style={styles.settingSubtitle}>
-                {isBiometricsAvailable ? 'Fingerprint / Face ID' : 'Hardware unavailable'}
+                {isBiometricsAvailable ? 'Fingerprint / Face ID Unlock' : 'Hardware unavailable'}
               </Text>
             </View>
             <Switch
@@ -193,8 +254,46 @@ export const ProfileScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Trading System & Engine */}
-        <Text style={styles.sectionHeader}>System Architecture</Text>
+        {/* 5. Trading Preferences */}
+        <Text style={styles.sectionHeader}>Trading Preferences</Text>
+        <View style={styles.settingsGroup}>
+          <View style={styles.settingItem}>
+            <View style={styles.settingIconContainer}>
+              <Icon name="time-outline" size={moderateScale(18)} color="#FFD700" />
+            </View>
+            <View style={styles.settingTextContainer}>
+              <Text style={styles.settingTitle}>After-Market Orders (AMO)</Text>
+              <Text style={styles.settingSubtitle}>Auto-queue orders when markets are closed</Text>
+            </View>
+            <Switch
+              value={amoAutoQueue}
+              onValueChange={setAmoAutoQueue}
+              trackColor={{ false: Colors.cardBorder, true: Colors.primaryDark }}
+              thumbColor={amoAutoQueue ? Colors.primary : Colors.textMuted}
+            />
+          </View>
+
+          <View style={styles.settingDivider} />
+
+          <View style={styles.settingItem}>
+            <View style={styles.settingIconContainer}>
+              <Icon name="notifications-outline" size={moderateScale(18)} color={Colors.primary} />
+            </View>
+            <View style={styles.settingTextContainer}>
+              <Text style={styles.settingTitle}>Market Bell & Holiday Alerts</Text>
+              <Text style={styles.settingSubtitle}>Toast notifications for open/close</Text>
+            </View>
+            <Switch
+              value={marketAlertsEnabled}
+              onValueChange={setMarketAlertsEnabled}
+              trackColor={{ false: Colors.cardBorder, true: Colors.primaryDark }}
+              thumbColor={marketAlertsEnabled ? Colors.primary : Colors.textMuted}
+            />
+          </View>
+        </View>
+
+        {/* 6. Trading Engine & System Architecture */}
+        <Text style={styles.sectionHeader}>Engine Architecture</Text>
         <View style={styles.settingsGroup}>
           <View style={styles.settingItem}>
             <View style={styles.settingIconContainer}>
@@ -214,20 +313,20 @@ export const ProfileScreen: React.FC = () => {
 
           <View style={styles.settingItem}>
             <View style={styles.settingIconContainer}>
-              <Icon name="swap-horizontal-outline" size={moderateScale(18)} color={Colors.primary} />
+              <Icon name="hardware-chip-outline" size={moderateScale(18)} color={Colors.primary} />
             </View>
             <View style={styles.settingTextContainer}>
-              <Text style={styles.settingTitle}>Session Security</Text>
-              <Text style={styles.settingSubtitle}>Socket Token 2FA Authenticated</Text>
+              <Text style={styles.settingTitle}>App Version</Text>
+              <Text style={styles.settingSubtitle}>TradeVault Aura v2.4.0 (Build 92)</Text>
             </View>
-            <Icon name="checkmark-circle-outline" size={moderateScale(18)} color={Colors.primary} />
+            <Text style={styles.versionText}>Latest</Text>
           </View>
         </View>
 
-        {/* Sign Out Button */}
+        {/* 7. Sign Out Button */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.8}>
           <Icon name="log-out-outline" size={moderateScale(18)} color={Colors.error} />
-          <Text style={styles.logoutButtonText}>Sign Out</Text>
+          <Text style={styles.logoutButtonText}>Sign Out of Account</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -244,20 +343,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: scale(20),
-    paddingTop: verticalScale(12),
-    paddingBottom: verticalScale(8),
+    paddingTop: verticalScale(10),
+    paddingBottom: verticalScale(6),
   },
   headerSubtitle: {
     color: Colors.textMuted,
-    fontSize: moderateScale(11),
-    fontWeight: '700',
+    fontSize: moderateScale(10),
+    fontWeight: '800',
     letterSpacing: 1.2,
   },
   headerTitle: {
     color: Colors.textPrimary,
-    fontSize: moderateScale(24),
-    fontWeight: '800',
-    letterSpacing: 0.3,
+    fontSize: moderateScale(22),
+    fontWeight: '900',
+    letterSpacing: 0.2,
   },
   statusBadge: {
     flexDirection: 'row',
@@ -271,12 +370,13 @@ const styles = StyleSheet.create({
   },
   statusBadgeText: {
     color: Colors.primary,
-    fontSize: moderateScale(10),
+    fontSize: moderateScale(9.5),
     fontWeight: '800',
     marginLeft: scale(4),
   },
   scrollContent: {
     paddingHorizontal: scale(20),
+    paddingTop: verticalScale(6),
     paddingBottom: verticalScale(100),
   },
   userCard: {
@@ -285,14 +385,19 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.card,
     borderRadius: moderateScale(16),
     padding: scale(16),
-    marginTop: verticalScale(10),
+    marginTop: verticalScale(6),
     borderWidth: 1,
     borderColor: Colors.cardBorder,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
   },
   avatarCircle: {
-    width: scale(52),
-    height: scale(52),
-    borderRadius: scale(26),
+    width: scale(54),
+    height: scale(54),
+    borderRadius: scale(27),
     backgroundColor: 'rgba(0, 230, 118, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -302,42 +407,67 @@ const styles = StyleSheet.create({
   },
   avatarInitials: {
     color: Colors.primary,
-    fontSize: moderateScale(18),
-    fontWeight: '800',
+    fontSize: moderateScale(19),
+    fontWeight: '900',
   },
   userInfo: {
     flex: 1,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   userName: {
     color: Colors.textPrimary,
     fontSize: moderateScale(16),
     fontWeight: '800',
   },
+  proBadge: {
+    backgroundColor: 'rgba(0, 230, 118, 0.15)',
+    paddingHorizontal: scale(5),
+    paddingVertical: verticalScale(1),
+    borderRadius: moderateScale(4),
+    marginLeft: scale(6),
+    borderWidth: 1,
+    borderColor: 'rgba(0, 230, 118, 0.3)',
+  },
+  proBadgeText: {
+    color: Colors.primary,
+    fontSize: moderateScale(8.5),
+    fontWeight: '900',
+  },
   userEmail: {
     color: Colors.textMuted,
-    fontSize: moderateScale(12),
+    fontSize: moderateScale(11.5),
     marginTop: verticalScale(1),
   },
-  userIdBadge: {
+  userIdChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: Colors.backgroundSecondary,
     alignSelf: 'flex-start',
-    paddingHorizontal: scale(6),
-    paddingVertical: verticalScale(2),
+    paddingHorizontal: scale(7),
+    paddingVertical: verticalScale(2.5),
     borderRadius: moderateScale(4),
-    marginTop: verticalScale(5),
+    marginTop: verticalScale(6),
   },
   userIdText: {
     color: Colors.textSecondary,
-    fontSize: moderateScale(10),
-    fontWeight: '600',
+    fontSize: moderateScale(9.5),
+    fontWeight: '700',
   },
   walletCard: {
     backgroundColor: Colors.card,
     borderRadius: moderateScale(16),
-    padding: scale(18),
-    marginTop: verticalScale(14),
+    padding: scale(16),
+    marginTop: verticalScale(12),
     borderWidth: 1,
     borderColor: Colors.cardBorder,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
   },
   walletTopRow: {
     flexDirection: 'row',
@@ -351,38 +481,98 @@ const styles = StyleSheet.create({
   walletLabel: {
     color: Colors.textMuted,
     fontSize: moderateScale(10),
-    fontWeight: '700',
+    fontWeight: '800',
     letterSpacing: 1,
     marginLeft: scale(6),
   },
   currencyBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    paddingHorizontal: scale(8),
+    paddingHorizontal: scale(7),
     paddingVertical: verticalScale(2),
-    borderRadius: moderateScale(6),
+    borderRadius: moderateScale(5),
   },
   currencyText: {
     color: Colors.textSecondary,
-    fontSize: moderateScale(10),
+    fontSize: moderateScale(9.5),
     fontWeight: '700',
   },
   walletBalance: {
     color: Colors.textPrimary,
     fontSize: moderateScale(28),
-    fontWeight: '800',
-    marginTop: verticalScale(8),
+    fontWeight: '900',
+    marginTop: verticalScale(6),
+    fontVariant: ['tabular-nums'],
   },
-  walletSubtext: {
+  walletMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(6),
+    marginTop: verticalScale(4),
+  },
+  metaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    paddingHorizontal: scale(6),
+    paddingVertical: verticalScale(2),
+    borderRadius: moderateScale(4),
+  },
+  greenDot: {
+    width: scale(4),
+    height: scale(4),
+    borderRadius: scale(2),
+    backgroundColor: Colors.primary,
+    marginRight: scale(4),
+  },
+  metaPillText: {
     color: Colors.textMuted,
-    fontSize: moderateScale(11),
-    marginTop: verticalScale(2),
+    fontSize: moderateScale(9.5),
+    fontWeight: '600',
+  },
+  walletActionsRow: {
+    flexDirection: 'row',
+    gap: scale(8),
+    marginTop: verticalScale(14),
+  },
+  walletActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 230, 118, 0.12)',
+    height: verticalScale(34),
+    borderRadius: moderateScale(8),
+    borderWidth: 1,
+    borderColor: 'rgba(0, 230, 118, 0.3)',
+  },
+  walletActionBtnText: {
+    color: Colors.primary,
+    fontSize: moderateScale(12),
+    fontWeight: '800',
+  },
+  walletActionBtnSecondary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    height: verticalScale(34),
+    borderRadius: moderateScale(8),
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  walletActionBtnSecText: {
+    color: Colors.textPrimary,
+    fontSize: moderateScale(12),
+    fontWeight: '700',
   },
   sectionHeader: {
     color: Colors.textPrimary,
-    fontSize: moderateScale(14),
-    fontWeight: '700',
-    marginTop: verticalScale(20),
-    marginBottom: verticalScale(10),
+    fontSize: moderateScale(13.5),
+    fontWeight: '800',
+    marginTop: verticalScale(18),
+    marginBottom: verticalScale(8),
+    letterSpacing: 0.2,
   },
   settingsGroup: {
     backgroundColor: Colors.card,
@@ -395,12 +585,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: scale(14),
-    paddingVertical: verticalScale(12),
+    paddingVertical: verticalScale(11),
   },
   settingIconContainer: {
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(18),
+    width: scale(34),
+    height: scale(34),
+    borderRadius: scale(10),
     backgroundColor: Colors.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -416,7 +606,7 @@ const styles = StyleSheet.create({
   },
   settingSubtitle: {
     color: Colors.textMuted,
-    fontSize: moderateScale(11),
+    fontSize: moderateScale(10.5),
     marginTop: verticalScale(1),
   },
   activePill: {
@@ -428,26 +618,31 @@ const styles = StyleSheet.create({
   activePillText: {
     color: Colors.primary,
     fontSize: moderateScale(10),
-    fontWeight: '700',
+    fontWeight: '800',
   },
   liveServerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 230, 118, 0.1)',
-    paddingHorizontal: scale(8),
+    paddingHorizontal: scale(7),
     paddingVertical: verticalScale(3),
-    borderRadius: moderateScale(8),
+    borderRadius: moderateScale(6),
   },
   liveDot: {
-    width: scale(6),
-    height: scale(6),
-    borderRadius: scale(3),
+    width: scale(5),
+    height: scale(5),
+    borderRadius: scale(2.5),
     backgroundColor: Colors.primary,
-    marginRight: scale(5),
+    marginRight: scale(4),
   },
   liveServerText: {
     color: Colors.primary,
-    fontSize: moderateScale(10),
+    fontSize: moderateScale(9.5),
+    fontWeight: '800',
+  },
+  versionText: {
+    color: Colors.textMuted,
+    fontSize: moderateScale(10.5),
     fontWeight: '700',
   },
   settingDivider: {
@@ -459,17 +654,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: verticalScale(46),
+    height: verticalScale(44),
     borderRadius: moderateScale(12),
     borderWidth: 1,
-    borderColor: 'rgba(255, 82, 82, 0.4)',
+    borderColor: 'rgba(255, 82, 82, 0.35)',
     backgroundColor: 'rgba(255, 82, 82, 0.08)',
-    marginTop: verticalScale(24),
+    marginTop: verticalScale(22),
+    marginBottom: verticalScale(20),
   },
   logoutButtonText: {
     color: Colors.error,
-    fontSize: moderateScale(14),
-    fontWeight: '700',
+    fontSize: moderateScale(13.5),
+    fontWeight: '800',
     marginLeft: scale(8),
   },
 });

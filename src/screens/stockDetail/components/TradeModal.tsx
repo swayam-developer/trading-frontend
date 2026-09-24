@@ -15,6 +15,7 @@ import { Stock, Holding } from '../../../services/stock/stock.types';
 import { Colors } from '../../../theme/colors';
 import { useStockStore } from '../../../store/stock/stockStore';
 import { useAuthStore } from '../../../store/auth/authStore';
+import { StockAvatar } from '../../../components/common/StockAvatar';
 
 interface TradeModalProps {
   visible: boolean;
@@ -36,8 +37,10 @@ export const TradeModal: React.FC<TradeModalProps> = ({
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>(initialType);
   const [quantityStr, setQuantityStr] = useState('1');
 
-  const { buyStock, sellStock, isTrading } = useStockStore();
+  const { buyStock, sellStock, isTrading, marketStatus } = useStockStore();
   const { profile } = useAuthStore();
+
+  const isMarketOpen = !!marketStatus?.isOpen;
 
   let currentPrice = typeof stock.currentPrice === 'number' ? stock.currentPrice : parseFloat(stock.currentPrice as any) || 0;
   if (currentPrice > 1000000) currentPrice = 175.43;
@@ -76,11 +79,19 @@ export const TradeModal: React.FC<TradeModalProps> = ({
     try {
       if (tradeType === 'buy') {
         await buyStock(stock._id, quantity);
-        Toast.show({
-          type: 'success',
-          text1: 'Order Executed',
-          text2: `Successfully purchased ${quantity} shares of ${stock.symbol}!`,
-        });
+        if (isMarketOpen) {
+          Toast.show({
+            type: 'success',
+            text1: 'Order Executed 🟢',
+            text2: `Successfully purchased ${quantity} shares of ${stock.symbol}!`,
+          });
+        } else {
+          Toast.show({
+            type: 'market_holiday',
+            text1: 'After-Market Order (AMO) Placed ⏳',
+            text2: `Your buy order for ${quantity} shares of ${stock.symbol} is queued for market open at 9:30 AM.`,
+          });
+        }
       } else {
         if (!holding) {
           Toast.show({
@@ -91,11 +102,19 @@ export const TradeModal: React.FC<TradeModalProps> = ({
           return;
         }
         await sellStock(holding._id, quantity);
-        Toast.show({
-          type: 'success',
-          text1: 'Order Executed',
-          text2: `Successfully sold ${quantity} shares of ${stock.symbol}!`,
-        });
+        if (isMarketOpen) {
+          Toast.show({
+            type: 'success',
+            text1: 'Order Executed 🟢',
+            text2: `Successfully sold ${quantity} shares of ${stock.symbol}!`,
+          });
+        } else {
+          Toast.show({
+            type: 'market_holiday',
+            text1: 'After-Market Sell Order Placed ⏳',
+            text2: `Your sell order for ${quantity} shares of ${stock.symbol} is queued for execution at 9:30 AM.`,
+          });
+        }
       }
       onSuccess?.();
       onClose();
@@ -122,11 +141,20 @@ export const TradeModal: React.FC<TradeModalProps> = ({
 
           {/* Modal Header */}
           <View style={styles.header}>
-            <View>
-              <Text style={styles.headerTitle}>{stock.symbol}</Text>
-              <Text style={styles.headerSubtitle}>
-                Market Price: ${currentPrice.toFixed(2)}
-              </Text>
+            <View style={styles.headerLeft}>
+              <StockAvatar
+                symbol={stock.symbol}
+                iconUrl={stock.iconUrl}
+                size={scale(38)}
+                borderRadius={scale(10)}
+                style={styles.headerAvatar}
+              />
+              <View>
+                <Text style={styles.headerTitle}>{stock.symbol}</Text>
+                <Text style={styles.headerSubtitle}>
+                  Market Price: ${currentPrice.toFixed(2)}
+                </Text>
+              </View>
             </View>
 
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -252,6 +280,19 @@ export const TradeModal: React.FC<TradeModalProps> = ({
             </View>
           </View>
 
+          {/* After-Market Order Notice when Market is Closed */}
+          {!isMarketOpen && (
+            <View style={styles.amoBanner}>
+              <Icon name="time-outline" size={moderateScale(16)} color="#FFD700" />
+              <View style={styles.amoBannerTextContainer}>
+                <Text style={styles.amoBannerTitle}>After-Market Order (AMO)</Text>
+                <Text style={styles.amoBannerSubtitle}>
+                  Markets are closed. This order will be queued and executed automatically when the market opens at 9:30 AM.
+                </Text>
+              </View>
+            </View>
+          )}
+
           {/* Validation Warning if unable */}
           {!canExecute && quantity > 0 && (
             <View style={styles.warningBox}>
@@ -281,9 +322,13 @@ export const TradeModal: React.FC<TradeModalProps> = ({
               <ActivityIndicator color={Colors.background} />
             ) : (
               <Text style={styles.executeButtonText}>
-                {tradeType === 'buy'
-                  ? `Confirm Buy • $${totalCost.toFixed(2)}`
-                  : `Confirm Sell • $${totalCost.toFixed(2)}`}
+                {isMarketOpen
+                  ? (tradeType === 'buy'
+                    ? `Confirm Buy • $${totalCost.toFixed(2)}`
+                    : `Confirm Sell • $${totalCost.toFixed(2)}`)
+                  : (tradeType === 'buy'
+                    ? `Place AMO Buy • $${totalCost.toFixed(2)}`
+                    : `Place AMO Sell • $${totalCost.toFixed(2)}`)}
               </Text>
             )}
           </TouchableOpacity>
@@ -322,6 +367,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: verticalScale(14),
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  headerAvatar: {
+    marginRight: scale(10),
   },
   headerTitle: {
     color: Colors.textPrimary,
@@ -488,6 +541,31 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontSize: moderateScale(15),
     fontWeight: '800',
+  },
+  amoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 215, 0, 0.08)',
+    borderRadius: moderateScale(10),
+    padding: scale(10),
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.25)',
+    marginBottom: verticalScale(12),
+  },
+  amoBannerTextContainer: {
+    flex: 1,
+    marginLeft: scale(8),
+  },
+  amoBannerTitle: {
+    color: '#FFD700',
+    fontSize: moderateScale(11.5),
+    fontWeight: '700',
+  },
+  amoBannerSubtitle: {
+    color: Colors.textSecondary,
+    fontSize: moderateScale(10),
+    lineHeight: moderateScale(14),
+    marginTop: verticalScale(2),
   },
   warningBox: {
     flexDirection: 'row',

@@ -1,17 +1,21 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 import { Order } from '../../../services/stock/stock.types';
 import { Colors } from '../../../theme/colors';
+import { StockAvatar } from '../../../components/common/StockAvatar';
 
 interface OrderCardProps {
   order: Order;
+  onPress?: () => void;
 }
 
-export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
+export const OrderCard: React.FC<OrderCardProps> = ({ order, onPress }) => {
   const isBuy = order.type === 'buy';
   const totalAmount = order.quantity * order.price;
+  const isAMO = order.status === 'PENDING_AMO' || (order as any).isAMO;
+  const isCancelled = order.status === 'CANCELLED';
 
   // Format date
   const formattedDate = React.useMemo(() => {
@@ -32,8 +36,14 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
     }
   }, [order.timestamp, (order as any).createdAt]);
 
+  const symbol = order.stock?.symbol || 'STOCK';
+
   return (
-    <View style={styles.card}>
+    <TouchableOpacity
+      style={styles.card}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
       {/* Top Header Row */}
       <View style={styles.topRow}>
         <View style={styles.typeBadgeContainer}>
@@ -58,23 +68,60 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
               {order.type.toUpperCase()}
             </Text>
           </View>
-          <View style={styles.statusPill}>
-            <Text style={styles.statusPillText}>EXECUTED</Text>
+
+          <View
+            style={[
+              styles.statusPill,
+              isAMO
+                ? styles.statusAmo
+                : isCancelled
+                ? styles.statusCancelled
+                : styles.statusExecuted,
+            ]}
+          >
+            <Text
+              style={[
+                styles.statusPillText,
+                isAMO
+                  ? { color: '#FFD700' }
+                  : isCancelled
+                  ? { color: Colors.error }
+                  : { color: Colors.primary },
+              ]}
+            >
+              {isAMO
+                ? 'AMO QUEUED'
+                : isCancelled
+                ? 'CANCELLED'
+                : 'EXECUTED'}
+            </Text>
           </View>
         </View>
 
         <Text style={styles.totalAmountText}>
-          {isBuy ? '-' : '+'}${totalAmount.toFixed(2)}
+          {isBuy ? '-' : '+'}${totalAmount.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
         </Text>
       </View>
 
       {/* Middle Row: Stock Symbol & Execution Details */}
       <View style={styles.middleRow}>
-        <View>
-          <Text style={styles.symbolText}>{order.stock?.symbol || 'STOCK'}</Text>
-          <Text style={styles.companyText} numberOfLines={1}>
-            {order.stock?.companyName || 'Security'}
-          </Text>
+        <View style={styles.stockIdentityRow}>
+          <StockAvatar
+            symbol={symbol}
+            iconUrl={order.stock?.iconUrl}
+            size={scale(38)}
+            borderRadius={scale(11)}
+            style={styles.avatarSpacing}
+          />
+          <View style={styles.symbolTextContainer}>
+            <Text style={styles.symbolText}>{symbol}</Text>
+            <Text style={styles.companyText} numberOfLines={1}>
+              {order.stock?.companyName || 'Security'}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.executionContainer}>
@@ -96,24 +143,37 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
           <Text style={styles.timeText}>{formattedDate}</Text>
         </View>
 
-        {order.remainingBalance !== undefined && (
-          <Text style={styles.balanceText}>
-            Bal: ${order.remainingBalance.toFixed(2)}
-          </Text>
-        )}
+        <View style={styles.bottomRight}>
+          {order.remainingBalance !== undefined && (
+            <Text style={styles.balanceText}>
+              Bal: ${order.remainingBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </Text>
+          )}
+          <Icon
+            name="chevron-forward"
+            size={moderateScale(12)}
+            color={Colors.textMuted}
+            style={{ marginLeft: scale(4) }}
+          />
+        </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.card,
-    borderRadius: moderateScale(14),
+    borderRadius: moderateScale(16),
     padding: scale(14),
     marginBottom: verticalScale(10),
     borderWidth: 1,
     borderColor: Colors.cardBorder,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
   },
   topRow: {
     flexDirection: 'row',
@@ -143,14 +203,21 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   statusPill: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     paddingHorizontal: scale(6),
     paddingVertical: verticalScale(2),
     borderRadius: moderateScale(4),
     marginLeft: scale(8),
   },
+  statusExecuted: {
+    backgroundColor: 'rgba(0, 230, 118, 0.1)',
+  },
+  statusAmo: {
+    backgroundColor: 'rgba(255, 215, 0, 0.12)',
+  },
+  statusCancelled: {
+    backgroundColor: 'rgba(255, 82, 82, 0.1)',
+  },
   statusPillText: {
-    color: Colors.textMuted,
     fontSize: moderateScale(9),
     fontWeight: '700',
   },
@@ -158,17 +225,30 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: moderateScale(15),
     fontWeight: '800',
+    fontVariant: ['tabular-nums'],
   },
   middleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: verticalScale(10),
+    marginTop: verticalScale(12),
+  },
+  stockIdentityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: scale(10),
+  },
+  avatarSpacing: {
+    marginRight: scale(10),
+  },
+  symbolTextContainer: {
+    flex: 1,
   },
   symbolText: {
     color: Colors.textPrimary,
     fontSize: moderateScale(15),
-    fontWeight: '700',
+    fontWeight: '800',
   },
   companyText: {
     color: Colors.textMuted,
@@ -181,12 +261,14 @@ const styles = StyleSheet.create({
   sharesText: {
     color: Colors.textPrimary,
     fontSize: moderateScale(13),
-    fontWeight: '700',
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
   },
   unitPriceText: {
     color: Colors.textMuted,
     fontSize: moderateScale(11),
     marginTop: verticalScale(1),
+    fontVariant: ['tabular-nums'],
   },
   divider: {
     height: 1,
@@ -207,9 +289,14 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(10),
     marginLeft: scale(4),
   },
+  bottomRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   balanceText: {
     color: Colors.textSecondary,
     fontSize: moderateScale(10),
     fontWeight: '600',
+    fontVariant: ['tabular-nums'],
   },
 });

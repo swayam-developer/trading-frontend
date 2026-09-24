@@ -3,6 +3,7 @@ import { StatusBar } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
+import { toastConfig } from './src/components/common/ToastConfig';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { Colors } from './src/theme/colors';
 import { StorageProvider } from './src/services/storage/StorageProvider';
@@ -23,7 +24,7 @@ function App() {
         <NavigationContainer>
           <RootNavigator />
         </NavigationContainer>
-        <Toast />
+        <Toast config={toastConfig} topOffset={50} />
       </StorageProvider>
     </SafeAreaProvider>
   );

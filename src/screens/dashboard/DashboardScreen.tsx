@@ -13,6 +13,7 @@ import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 import { RootNavigationProp } from '../../navigation/types';
 import { Colors } from '../../theme/colors';
 import { useAuthStore } from '../../store/auth/authStore';
+import { StockAvatar } from '../../components/common/StockAvatar';
 
 export const DashboardScreen: React.FC = () => {
   const navigation = useNavigation<RootNavigationProp<'Dashboard'>>();
@@ -75,15 +76,23 @@ export const DashboardScreen: React.FC = () => {
         {/* Market Watchlist Preview */}
         <Text style={styles.sectionTitle}>Market Watchlist</Text>
         {[
-          { symbol: 'BTC/USD', name: 'Bitcoin', price: '$64,280.00', change: '+3.42%', up: true },
-          { symbol: 'ETH/USD', name: 'Ethereum', price: '$3,490.50', change: '+1.85%', up: true },
-          { symbol: 'TSLA', name: 'Tesla, Inc.', price: '$255.50', change: '-0.92%', up: false },
-          { symbol: 'NVDA', name: 'Nvidia Corp.', price: '$128.40', change: '+4.12%', up: true },
+          { symbol: 'AAPL', name: 'Apple Inc.', price: '$175.43', change: '+1.42%', up: true },
+          { symbol: 'MSFT', name: 'Microsoft Corporation', price: '$338.11', change: '+0.85%', up: true },
+          { symbol: 'TSLA', name: 'Tesla, Inc.', price: '$248.50', change: '-0.92%', up: false },
+          { symbol: 'NVDA', name: 'Nvidia Corp.', price: '$485.09', change: '+4.12%', up: true },
         ].map((item, idx) => (
           <View key={idx} style={styles.stockItem}>
-            <View>
-              <Text style={styles.stockSymbol}>{item.symbol}</Text>
-              <Text style={styles.stockName}>{item.name}</Text>
+            <View style={styles.stockLeft}>
+              <StockAvatar
+                symbol={item.symbol}
+                size={scale(36)}
+                borderRadius={scale(10)}
+                style={styles.stockAvatar}
+              />
+              <View>
+                <Text style={styles.stockSymbol}>{item.symbol}</Text>
+                <Text style={styles.stockName}>{item.name}</Text>
+              </View>
             </View>
             <View style={styles.stockPriceContainer}>
               <Text style={styles.stockPrice}>{item.price}</Text>
@@ -261,6 +270,13 @@ const styles = StyleSheet.create({
     marginBottom: verticalScale(8),
     borderWidth: 1,
     borderColor: Colors.cardBorder,
+  },
+  stockLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  stockAvatar: {
+    marginRight: scale(10),
   },
   stockSymbol: {
     color: Colors.textPrimary,

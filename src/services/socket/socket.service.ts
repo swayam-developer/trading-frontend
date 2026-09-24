@@ -9,6 +9,7 @@ class SocketService {
   private marketStatus: MarketStatusData | null = null;
   private onStockUpdateListeners: Array<(stock: Stock) => void> = [];
   private onStatusChangeListeners: Array<(connected: boolean) => void> = [];
+  private onMarketStatusListeners: Array<(status: MarketStatusData) => void> = [];
 
   /**
    * Set market status received from backend API
@@ -73,6 +74,11 @@ class SocketService {
           const symbols = Array.from(this.subscribedSymbols);
           this.socket?.emit('subscribeToMultipleStocks', symbols);
         }
+      });
+
+      this.socket.on('marketStatus', (status: MarketStatusData) => {
+        this.marketStatus = status;
+        this.notifyMarketStatus(status);
       });
 
       this.socket.on('connect_error', (error) => {
@@ -170,6 +176,16 @@ class SocketService {
   }
 
   /**
+   * Register a listener for real-time market status / holiday updates
+   */
+  public onMarketStatus(callback: (status: MarketStatusData) => void): () => void {
+    this.onMarketStatusListeners.push(callback);
+    return () => {
+      this.onMarketStatusListeners = this.onMarketStatusListeners.filter((cb) => cb !== callback);
+    };
+  }
+
+  /**
    * Disconnect and clear all listeners
    */
   public disconnect(): void {
@@ -202,6 +218,16 @@ class SocketService {
         cb(connected);
       } catch (err) {
         console.warn('[SocketService] Error in onStatusChange listener:', err);
+      }
+    });
+  }
+
+  private notifyMarketStatus(status: MarketStatusData): void {
+    this.onMarketStatusListeners.forEach((cb) => {
+      try {
+        cb(status);
+      } catch (err) {
+        console.warn('[SocketService] Error in onMarketStatus listener:', err);
       }
     });
   }

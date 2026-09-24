@@ -8,6 +8,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
@@ -63,7 +64,7 @@ export const SetPinScreen: React.FC = () => {
       const nextPin = firstPin + digit;
       setFirstPin(nextPin);
       if (nextPin.length === 4) {
-        setTimeout(() => setMode('pin_confirm'), 200);
+        setTimeout(() => setMode('pin_confirm'), 250);
       }
     } else if (mode === 'pin_confirm') {
       const nextPin = confirmPin + digit;
@@ -89,7 +90,7 @@ export const SetPinScreen: React.FC = () => {
 
   const handlePinSubmit = async (enteredConfirmPin: string) => {
     if (firstPin !== enteredConfirmPin) {
-      setError('PINs do not match. Try again.');
+      setError('PINs do not match. Please re-enter.');
       setConfirmPin('');
       setFirstPin('');
       setMode('pin_create');
@@ -100,8 +101,8 @@ export const SetPinScreen: React.FC = () => {
       await setPin(firstPin);
       Toast.show({
         type: 'success',
-        text1: 'PIN Activated',
-        text2: 'Your 4-digit security PIN is now set.',
+        text1: 'MPIN Activated',
+        text2: 'Your 4-digit security PIN is now active.',
       });
 
       if (isBothFlow && isBiometricsAvailable) {
@@ -158,16 +159,25 @@ export const SetPinScreen: React.FC = () => {
   if (mode === 'pin_create' || mode === 'pin_confirm') {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" />
+        <StatusBar barStyle="light-content" backgroundColor={Colors.background} />
+
+        {/* Ambient Backlight Glow */}
+        <View style={styles.ambientGlowTop} pointerEvents="none" />
+        <View style={styles.ambientGlowBottom} pointerEvents="none" />
 
         <View style={styles.header}>
           <AuraLogo size={44} showTagline={false} />
+          <View style={styles.stepBadge}>
+            <Text style={styles.stepBadgeText}>
+              {mode === 'pin_create' ? 'STEP 1 OF 2 • CREATE' : 'STEP 2 OF 2 • CONFIRM'}
+            </Text>
+          </View>
           <Text style={styles.title}>
             {mode === 'pin_create' ? 'Set 4-Digit MPIN' : 'Confirm Your MPIN'}
           </Text>
           <Text style={styles.subtitle}>
             {mode === 'pin_create'
-              ? 'Enter a 4-digit PIN for swift authentication'
+              ? 'Enter a 4-digit PIN for swift access'
               : 'Re-enter your 4-digit PIN to confirm'}
           </Text>
         </View>
@@ -190,17 +200,21 @@ export const SetPinScreen: React.FC = () => {
           }}
           activeOpacity={0.7}
         >
+          <Icon name="arrow-back-outline" size={moderateScale(14)} color={Colors.secondary} style={{ marginRight: 6 }} />
           <Text style={styles.backToChoiceText}>Change Security Option</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  // --- Render Already Configured View (e.g. PIN already set on server) ---
+  // --- Render Already Configured View ---
   if (mode === 'already_configured') {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" />
+        <StatusBar barStyle="light-content" backgroundColor={Colors.background} />
+
+        <View style={styles.ambientGlowTop} pointerEvents="none" />
+        <View style={styles.ambientGlowBottom} pointerEvents="none" />
 
         <View style={styles.header}>
           <AuraLogo size={44} showTagline={false} />
@@ -225,10 +239,9 @@ export const SetPinScreen: React.FC = () => {
             onPress={() => navigation.replace('Dashboard')}
             activeOpacity={0.7}
           >
-            <Text style={styles.secondaryActionText}>Continue to Dashboard</Text>
+            <Text style={styles.secondaryActionText}>Continue to Dashboard →</Text>
           </TouchableOpacity>
         </View>
-
         <View />
       </View>
     );
@@ -237,11 +250,18 @@ export const SetPinScreen: React.FC = () => {
   // --- Render Security Options Choice Screen ---
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="light-content" backgroundColor={Colors.background} />
+
+      {/* Ambient Backlight Glow */}
+      <View style={styles.ambientGlowTop} pointerEvents="none" />
+      <View style={styles.ambientGlowBottom} pointerEvents="none" />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <AuraLogo size={48} showTagline={false} />
+          <View style={styles.stepBadge}>
+            <Text style={styles.stepBadgeText}>HARDWARE SECURITY</Text>
+          </View>
           <Text style={styles.title}>Choose Unlock Security</Text>
           <Text style={styles.subtitle}>
             Select how you want to protect and quickly unlock your portfolio.
@@ -260,11 +280,12 @@ export const SetPinScreen: React.FC = () => {
               activeOpacity={0.75}
             >
               <View style={styles.badge}>
+                <Icon name="sparkles" size={moderateScale(10)} color={Colors.background} style={{ marginRight: 3 }} />
                 <Text style={styles.badgeText}>RECOMMENDED</Text>
               </View>
               <View style={styles.optionHeader}>
                 <View style={[styles.optionIconCircle, styles.bothIconCircle]}>
-                  <Icon name="shield-checkmark-outline" size={moderateScale(24)} color={Colors.primary} />
+                  <Icon name="shield-checkmark" size={moderateScale(22)} color={Colors.primary} />
                 </View>
                 <View style={styles.optionDetails}>
                   <Text style={styles.optionTitle}>MPIN + {biometricName}</Text>
@@ -272,6 +293,7 @@ export const SetPinScreen: React.FC = () => {
                     Best combination of speed and backup security. Unlock with {biometricName.toLowerCase()} or PIN anytime.
                   </Text>
                 </View>
+                <Icon name="chevron-forward" size={moderateScale(18)} color={Colors.primary} />
               </View>
             </TouchableOpacity>
           )}
@@ -286,7 +308,7 @@ export const SetPinScreen: React.FC = () => {
             >
               <View style={styles.optionHeader}>
                 <View style={styles.optionIconCircle}>
-                  <Icon name={biometricIcon} size={moderateScale(24)} color={Colors.primary} />
+                  <Icon name={biometricIcon} size={moderateScale(22)} color={Colors.secondary} />
                 </View>
                 <View style={styles.optionDetails}>
                   <Text style={styles.optionTitle}>{biometricName} Only</Text>
@@ -294,7 +316,11 @@ export const SetPinScreen: React.FC = () => {
                     1-touch instant unlock using your device biometric sensor without remembering a PIN.
                   </Text>
                 </View>
-                {enrollingBio && <ActivityIndicator color={Colors.primary} size="small" />}
+                {enrollingBio ? (
+                  <ActivityIndicator color={Colors.primary} size="small" />
+                ) : (
+                  <Icon name="chevron-forward" size={moderateScale(18)} color={Colors.textMuted} />
+                )}
               </View>
             </TouchableOpacity>
           )}
@@ -310,7 +336,7 @@ export const SetPinScreen: React.FC = () => {
           >
             <View style={styles.optionHeader}>
               <View style={styles.optionIconCircle}>
-                <Icon name="keypad-outline" size={moderateScale(24)} color={Colors.primary} />
+                <Icon name="keypad-outline" size={moderateScale(22)} color={Colors.accentGold} />
               </View>
               <View style={styles.optionDetails}>
                 <Text style={styles.optionTitle}>4-Digit MPIN Only</Text>
@@ -318,6 +344,7 @@ export const SetPinScreen: React.FC = () => {
                   Traditional numeric PIN passcode to unlock your account.
                 </Text>
               </View>
+              <Icon name="chevron-forward" size={moderateScale(18)} color={Colors.textMuted} />
             </View>
           </TouchableOpacity>
         </View>
@@ -358,6 +385,24 @@ const styles = StyleSheet.create({
     paddingVertical: verticalScale(20),
     paddingHorizontal: scale(20),
   },
+  ambientGlowTop: {
+    position: 'absolute',
+    top: -scale(80),
+    right: scale(10),
+    width: scale(220),
+    height: scale(220),
+    borderRadius: scale(110),
+    backgroundColor: 'rgba(0, 230, 118, 0.05)',
+  },
+  ambientGlowBottom: {
+    position: 'absolute',
+    bottom: -scale(80),
+    left: -scale(30),
+    width: scale(220),
+    height: scale(220),
+    borderRadius: scale(110),
+    backgroundColor: 'rgba(0, 229, 255, 0.04)',
+  },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'space-between',
@@ -366,13 +411,28 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginTop: verticalScale(10),
-    marginBottom: verticalScale(20),
+    marginBottom: verticalScale(16),
+  },
+  stepBadge: {
+    backgroundColor: 'rgba(0, 230, 118, 0.08)',
+    borderColor: 'rgba(0, 230, 118, 0.25)',
+    borderWidth: 1,
+    paddingHorizontal: scale(10),
+    paddingVertical: verticalScale(3),
+    borderRadius: moderateScale(10),
+    marginTop: verticalScale(8),
+  },
+  stepBadgeText: {
+    color: Colors.primary,
+    fontSize: moderateScale(10),
+    fontWeight: '700',
+    letterSpacing: 1,
   },
   title: {
     color: Colors.textPrimary,
     fontSize: moderateScale(22),
     fontWeight: '700',
-    marginTop: verticalScale(12),
+    marginTop: verticalScale(10),
     textAlign: 'center',
   },
   subtitle: {
@@ -389,30 +449,38 @@ const styles = StyleSheet.create({
   },
   optionCard: {
     backgroundColor: Colors.card,
-    borderRadius: moderateScale(14),
+    borderRadius: moderateScale(16),
     borderWidth: 1,
     borderColor: Colors.cardBorder,
     padding: scale(16),
     marginBottom: verticalScale(14),
     position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 3,
   },
   recommendedCard: {
     borderColor: Colors.primary,
-    backgroundColor: 'rgba(0, 229, 155, 0.04)',
+    backgroundColor: 'rgba(0, 230, 118, 0.04)',
+    borderWidth: 1.5,
   },
   badge: {
     position: 'absolute',
-    top: -verticalScale(9),
+    top: -verticalScale(10),
     right: scale(14),
     backgroundColor: Colors.primary,
     paddingHorizontal: scale(8),
-    paddingVertical: verticalScale(2),
-    borderRadius: moderateScale(4),
+    paddingVertical: verticalScale(3),
+    borderRadius: moderateScale(6),
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   badgeText: {
     color: Colors.background,
-    fontSize: moderateScale(10),
-    fontWeight: '700',
+    fontSize: moderateScale(9),
+    fontWeight: '800',
     letterSpacing: 0.5,
   },
   optionHeader: {
@@ -420,28 +488,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   optionIconCircle: {
-    width: scale(46),
-    height: scale(46),
-    borderRadius: scale(23),
-    backgroundColor: 'rgba(0, 229, 155, 0.1)',
+    width: scale(44),
+    height: scale(44),
+    borderRadius: scale(22),
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
-    borderColor: 'rgba(0, 229, 155, 0.3)',
+    borderColor: Colors.divider,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: scale(14),
+    marginRight: scale(12),
   },
   bothIconCircle: {
-    backgroundColor: 'rgba(0, 229, 155, 0.18)',
-    borderColor: Colors.primary,
+    backgroundColor: 'rgba(0, 230, 118, 0.12)',
+    borderColor: 'rgba(0, 230, 118, 0.3)',
   },
   optionDetails: {
     flex: 1,
+    marginRight: scale(8),
   },
   optionTitle: {
     color: Colors.textPrimary,
     fontSize: moderateScale(15),
-    fontWeight: '600',
-    marginBottom: verticalScale(3),
+    fontWeight: '700',
+    marginBottom: verticalScale(2),
   },
   optionDesc: {
     color: Colors.textSecondary,
@@ -449,13 +518,15 @@ const styles = StyleSheet.create({
     lineHeight: moderateScale(16),
   },
   backToChoiceButton: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: verticalScale(12),
   },
   backToChoiceText: {
     color: Colors.secondary,
     fontSize: moderateScale(13),
-    fontWeight: '500',
+    fontWeight: '600',
   },
   skipButton: {
     alignItems: 'center',
@@ -481,5 +552,6 @@ const styles = StyleSheet.create({
   secondaryActionText: {
     color: Colors.textSecondary,
     fontSize: moderateScale(13),
+    fontWeight: '600',
   },
 });

@@ -8,7 +8,8 @@ import {
   TouchableOpacity,
   RefreshControl,
   StatusBar,
-  ActivityIndicator,
+  ScrollView,
+  Modal,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
@@ -16,16 +17,19 @@ import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../theme/colors';
 import { useStockStore } from '../../store/stock/stockStore';
-import { useAuthStore } from '../../store/auth/authStore';
 import { Stock } from '../../services/stock/stock.types';
 import { StockCard } from './components/StockCard';
+import { MarketIndicesStrip } from './components/MarketIndicesStrip';
 import { RootNavigationProp } from '../../navigation/types';
-import { getSocketAccessToken, setSocketTokens } from '../../services/apiClient';
-
-
 import { socketService } from '../../services/socket/socket.service';
+import { WatchlistSkeleton } from '../../components/common/SkeletonLoader';
+import { marketAlertService } from '../../services/marketAlert/marketAlert.service';
 
-type FilterType = 'all' | 'gainers' | 'losers';
+type CategoryFilter = 'all' | 'gainers' | 'losers' | 'tech' | 'finance';
+type SortOption = 'default' | 'change_desc' | 'change_asc' | 'price_desc' | 'price_asc' | 'symbol_asc';
+
+const TECH_SYMBOLS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'NFLX'];
+const FINANCE_SYMBOLS = ['JPM', 'V', 'WMT', 'PG', 'HD', 'DIS', 'JNJ'];
 
 export const WatchlistScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -36,30 +40,29 @@ export const WatchlistScreen: React.FC = () => {
     fetchStocks,
     setSelectedStock,
     initSocket,
-    isSocketConnected,
     marketStatus,
   } = useStockStore();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<CategoryFilter>('all');
+  const [activeSort, setActiveSort] = useState<SortOption>('default');
+  const [pillMode, setPillMode] = useState<'percent' | 'dollar'>('percent');
+  const [isSortModalVisible, setIsSortModalVisible] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
-    // 1. Initialize socket connection
     initSocket();
 
-    // 2. Fetch initial stocks
     const load = async () => {
       const data = await fetchStocks();
       if (data && data.length > 0) {
-        // 3. Subscribe to real-time updates for all stock symbols
         socketService.subscribeToMultipleStocks(data.map((s) => s.symbol));
       }
     };
     load();
   }, [fetchStocks, initSocket]);
 
-  // Subscribe whenever stocks list updates
   useEffect(() => {
     if (stocks.length > 0) {
       socketService.subscribeToMultipleStocks(stocks.map((s) => s.symbol));
@@ -80,168 +83,254 @@ export const WatchlistScreen: React.FC = () => {
     navigation.navigate('StockDetail', { stock });
   };
 
-  const filteredStocks = useMemo(() => {
-    return stocks.filter((stock) => {
+  // Filter and sort stocks
+  const processedStocks = useMemo(() => {
+    let result = stocks.filter((stock) => {
+      const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
-        stock.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        stock.companyName.toLowerCase().includes(searchQuery.toLowerCase());
+        !q ||
+        stock.symbol.toLowerCase().includes(q) ||
+        stock.companyName.toLowerCase().includes(q);
 
       if (!matchesSearch) return false;
 
       const diff = stock.currentPrice - stock.lastDayTradedPrice;
-      if (activeFilter === 'gainers') return diff > 0;
-      if (activeFilter === 'losers') return diff < 0;
+      if (activeCategory === 'gainers') return diff > 0;
+      if (activeCategory === 'losers') return diff < 0;
+      if (activeCategory === 'tech') return TECH_SYMBOLS.includes(stock.symbol.toUpperCase());
+      if (activeCategory === 'finance') return FINANCE_SYMBOLS.includes(stock.symbol.toUpperCase());
+
       return true;
     });
-  }, [stocks, searchQuery, activeFilter]);
 
-  const gainersCount = useMemo(
-    () => stocks.filter((s) => s.currentPrice >= s.lastDayTradedPrice).length,
-    [stocks]
-  );
-  const losersCount = useMemo(
-    () => stocks.filter((s) => s.currentPrice < s.lastDayTradedPrice).length,
-    [stocks]
-  );
+    // Apply sorting
+    if (activeSort === 'change_desc') {
+      result = [...result].sort((a, b) => {
+        const pA = a.lastDayTradedPrice > 0 ? (a.currentPrice - a.lastDayTradedPrice) / a.lastDayTradedPrice : 0;
+        const pB = b.lastDayTradedPrice > 0 ? (b.currentPrice - b.lastDayTradedPrice) / b.lastDayTradedPrice : 0;
+        return pB - pA;
+      });
+    } else if (activeSort === 'change_asc') {
+      result = [...result].sort((a, b) => {
+        const pA = a.lastDayTradedPrice > 0 ? (a.currentPrice - a.lastDayTradedPrice) / a.lastDayTradedPrice : 0;
+        const pB = b.lastDayTradedPrice > 0 ? (b.currentPrice - b.lastDayTradedPrice) / b.lastDayTradedPrice : 0;
+        return pA - pB;
+      });
+    } else if (activeSort === 'price_desc') {
+      result = [...result].sort((a, b) => b.currentPrice - a.currentPrice);
+    } else if (activeSort === 'price_asc') {
+      result = [...result].sort((a, b) => a.currentPrice - b.currentPrice);
+    } else if (activeSort === 'symbol_asc') {
+      result = [...result].sort((a, b) => a.symbol.localeCompare(b.symbol));
+    }
+
+    return result;
+  }, [stocks, searchQuery, activeCategory, activeSort]);
 
   const isLive = !!marketStatus?.isOpen;
-  const statusLabel = marketStatus?.message?.toUpperCase() || (isLive ? 'MARKETS OPEN' : 'MARKET CLOSED');
-
+  const statusLabel = isLive ? 'NYSE OPEN' : 'CLOSED';
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerSubtitle}>GLOBAL MARKETS</Text>
-          <Text style={styles.headerTitle}>Watchlist</Text>
+      {/* 1. Ultra-Clean Top Bar */}
+      <View style={styles.topBar}>
+        <View style={styles.titleGroup}>
+          <Text style={styles.screenTitle}>Watchlist</Text>
+          <View style={styles.badgeCount}>
+            <Text style={styles.badgeCountText}>{stocks.length}</Text>
+          </View>
         </View>
 
-        <View
-          style={[
-            styles.marketStatusBadge,
-            !isLive && { backgroundColor: 'rgba(255, 171, 0, 0.1)', borderColor: 'rgba(255, 171, 0, 0.25)' },
-          ]}
-        >
-          <View
+        <View style={styles.topBarActions}>
+          {/* Search Toggle Icon */}
+          <TouchableOpacity
+            style={[styles.iconButton, (isSearchOpen || searchQuery.length > 0) && styles.iconButtonActive]}
+            onPress={() => setIsSearchOpen((prev) => !prev)}
+            activeOpacity={0.7}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Icon
+              name={isSearchOpen || searchQuery.length > 0 ? 'search' : 'search-outline'}
+              size={moderateScale(18)}
+              color={isSearchOpen || searchQuery.length > 0 ? Colors.primary : Colors.textPrimary}
+            />
+          </TouchableOpacity>
+
+          {/* Sort Menu Button */}
+          <TouchableOpacity
+            style={[styles.iconButton, activeSort !== 'default' && styles.iconButtonActive]}
+            onPress={() => setIsSortModalVisible(true)}
+            activeOpacity={0.7}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Icon
+              name="swap-vertical"
+              size={moderateScale(18)}
+              color={activeSort !== 'default' ? Colors.primary : Colors.textPrimary}
+            />
+          </TouchableOpacity>
+
+          {/* Market Status Pill */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              if (marketStatus) {
+                marketAlertService.showMarketAlert(marketStatus, true);
+              }
+            }}
             style={[
-              styles.liveIndicator,
-              !isLive && { backgroundColor: '#FFAB00', shadowColor: '#FFAB00' },
-            ]}
-          />
-          <Text
-            style={[
-              styles.marketStatusText,
-              !isLive && { color: '#FFAB00' },
+              styles.marketPill,
+              !isLive && styles.marketPillClosed,
             ]}
           >
-            {statusLabel}
-          </Text>
+            <View
+              style={[
+                styles.marketDot,
+                !isLive && styles.marketDotClosed,
+              ]}
+            />
+            <Text
+              style={[
+                styles.marketPillText,
+                !isLive && styles.marketPillTextClosed,
+              ]}
+            >
+              {statusLabel}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
+      {/* 2. Micro Market Indices Strip */}
+      <MarketIndicesStrip />
 
-      {/* Market Indices Ticker */}
-      <View style={styles.tickerContainer}>
-        <View style={styles.tickerItem}>
-          <Text style={styles.tickerName}>NIFTY 50</Text>
-          <Text style={styles.tickerValue}>25,320.10</Text>
-          <Text style={styles.tickerGain}>+0.84%</Text>
+      {/* 3. Search Bar (Visible when toggled or search active) */}
+      {(isSearchOpen || searchQuery.length > 0) && (
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBar}>
+            <Icon name="search-outline" size={moderateScale(16)} color={Colors.textMuted} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search ticker, company name..."
+              placeholderTextColor={Colors.textPlaceholder}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus={isSearchOpen && searchQuery.length === 0}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearchQuery('')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Icon name="close-circle" size={moderateScale(16)} color={Colors.textMuted} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-        <View style={styles.tickerDivider} />
-        <View style={styles.tickerItem}>
-          <Text style={styles.tickerName}>S&P 500</Text>
-          <Text style={styles.tickerValue}>5,688.20</Text>
-          <Text style={styles.tickerGain}>+0.42%</Text>
-        </View>
-        <View style={styles.tickerDivider} />
-        <View style={styles.tickerItem}>
-          <Text style={styles.tickerName}>NASDAQ</Text>
-          <Text style={styles.tickerValue}>17,948.30</Text>
-          <Text style={styles.tickerLoss}>-0.18%</Text>
-        </View>
-      </View>
+      )}
 
-      {/* Search Input */}
-      <View style={styles.searchSection}>
-        <View style={styles.searchBar}>
-          <Icon name="search-outline" size={moderateScale(18)} color={Colors.textMuted} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search symbol, company..."
-            placeholderTextColor={Colors.textPlaceholder}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Icon name="close-circle" size={moderateScale(16)} color={Colors.textMuted} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
+      {/* 4. Horizontal Category Filter Chips */}
+      <View style={styles.filterStrip}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScroll}
+        >
+          <TouchableOpacity
+            style={[styles.filterChip, activeCategory === 'all' && styles.filterChipActive]}
+            onPress={() => setActiveCategory('all')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.filterChipText, activeCategory === 'all' && styles.filterChipTextActive]}>
+              All
+            </Text>
+          </TouchableOpacity>
 
-      {/* Filter Tabs */}
-      <View style={styles.filterRow}>
+          <TouchableOpacity
+            style={[styles.filterChip, activeCategory === 'gainers' && styles.filterChipActive]}
+            onPress={() => setActiveCategory('gainers')}
+            activeOpacity={0.7}
+          >
+            <Icon
+              name="trending-up"
+              size={moderateScale(12)}
+              color={activeCategory === 'gainers' ? Colors.primary : Colors.textMuted}
+              style={{ marginRight: scale(4) }}
+            />
+            <Text style={[styles.filterChipText, activeCategory === 'gainers' && styles.filterChipTextActive]}>
+              Gainers
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.filterChip, activeCategory === 'losers' && styles.filterChipActive]}
+            onPress={() => setActiveCategory('losers')}
+            activeOpacity={0.7}
+          >
+            <Icon
+              name="trending-down"
+              size={moderateScale(12)}
+              color={activeCategory === 'losers' ? Colors.error : Colors.textMuted}
+              style={{ marginRight: scale(4) }}
+            />
+            <Text style={[styles.filterChipText, activeCategory === 'losers' && styles.filterChipTextActive]}>
+              Losers
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.filterChip, activeCategory === 'tech' && styles.filterChipActive]}
+            onPress={() => setActiveCategory('tech')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.emojiIcon}>💻</Text>
+            <Text style={[styles.filterChipText, activeCategory === 'tech' && styles.filterChipTextActive]}>
+              Tech
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.filterChip, activeCategory === 'finance' && styles.filterChipActive]}
+            onPress={() => setActiveCategory('finance')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.emojiIcon}>🏦</Text>
+            <Text style={[styles.filterChipText, activeCategory === 'finance' && styles.filterChipTextActive]}>
+              Finance
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        {/* Global Pill Toggle (% vs $) */}
         <TouchableOpacity
-          style={[styles.filterChip, activeFilter === 'all' && styles.filterChipActive]}
-          onPress={() => setActiveFilter('all')}
+          style={styles.pillModeButton}
+          onPress={() => setPillMode((prev) => (prev === 'percent' ? 'dollar' : 'percent'))}
           activeOpacity={0.7}
         >
-          <Text style={[styles.filterText, activeFilter === 'all' && styles.filterTextActive]}>
-            All ({stocks.length})
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.filterChip, activeFilter === 'gainers' && styles.filterChipActive]}
-          onPress={() => setActiveFilter('gainers')}
-          activeOpacity={0.7}
-        >
-          <Icon
-            name="trending-up"
-            size={moderateScale(13)}
-            color={activeFilter === 'gainers' ? Colors.primary : Colors.textMuted}
-            style={styles.chipIcon}
-          />
-          <Text style={[styles.filterText, activeFilter === 'gainers' && styles.filterTextActive]}>
-            Gainers ({gainersCount})
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.filterChip, activeFilter === 'losers' && styles.filterChipActive]}
-          onPress={() => setActiveFilter('losers')}
-          activeOpacity={0.7}
-        >
-          <Icon
-            name="trending-down"
-            size={moderateScale(13)}
-            color={activeFilter === 'losers' ? Colors.error : Colors.textMuted}
-            style={styles.chipIcon}
-          />
-          <Text style={[styles.filterText, activeFilter === 'losers' && styles.filterTextActive]}>
-            Losers ({losersCount})
+          <Text style={styles.pillModeText}>
+            {pillMode === 'percent' ? '%' : '$'}
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Stock List */}
+      {/* 5. Stock List / Skeleton / Empty State */}
       {isLoadingStocks && stocks.length === 0 ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Fetching live market data...</Text>
-        </View>
+        <WatchlistSkeleton />
       ) : (
         <FlatList
-          data={filteredStocks}
+          data={processedStocks}
           keyExtractor={(item) => item._id || item.symbol}
           renderItem={({ item }) => (
-            <StockCard stock={item} onPress={() => handleStockPress(item)} />
+            <StockCard
+              stock={item}
+              onPress={() => handleStockPress(item)}
+              pillDisplayMode={pillMode}
+              onTogglePillMode={() => setPillMode((prev) => (prev === 'percent' ? 'dollar' : 'percent'))}
+            />
           )}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
@@ -255,17 +344,94 @@ export const WatchlistScreen: React.FC = () => {
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Icon name="search-outline" size={moderateScale(48)} color={Colors.textMuted} />
-              <Text style={styles.emptyTitle}>No stocks found</Text>
+              <View style={styles.emptyIconCircle}>
+                <Icon name="search-outline" size={moderateScale(28)} color={Colors.textMuted} />
+              </View>
+              <Text style={styles.emptyTitle}>No Securities Found</Text>
               <Text style={styles.emptySubtitle}>
                 {searchQuery
-                  ? `No results match "${searchQuery}"`
+                  ? `No stocks match "${searchQuery}".`
                   : 'No securities available in this category.'}
               </Text>
+              {(searchQuery.length > 0 || activeCategory !== 'all' || activeSort !== 'default') && (
+                <TouchableOpacity
+                  style={styles.resetButton}
+                  onPress={() => {
+                    setSearchQuery('');
+                    setIsSearchOpen(false);
+                    setActiveCategory('all');
+                    setActiveSort('default');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.resetButtonText}>Reset Filters</Text>
+                </TouchableOpacity>
+              )}
             </View>
           }
         />
       )}
+
+      {/* 6. Sort Selection Modal Bottom Sheet */}
+      <Modal
+        visible={isSortModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsSortModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setIsSortModalVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Sort By</Text>
+
+            {[
+              { key: 'default', label: 'Default Order', icon: 'reorder-two' },
+              { key: 'change_desc', label: 'Top Gainers (% High to Low)', icon: 'trending-up' },
+              { key: 'change_asc', label: 'Top Losers (% Low to High)', icon: 'trending-down' },
+              { key: 'price_desc', label: 'Highest Price ($ High to Low)', icon: 'cash-outline' },
+              { key: 'price_asc', label: 'Lowest Price ($ Low to High)', icon: 'wallet-outline' },
+              { key: 'symbol_asc', label: 'Symbol (A to Z)', icon: 'text-outline' },
+            ].map((opt) => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[
+                  styles.sortOptionRow,
+                  activeSort === opt.key && styles.sortOptionRowActive,
+                ]}
+                onPress={() => {
+                  setActiveSort(opt.key as SortOption);
+                  setIsSortModalVisible(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.sortOptionLeft}>
+                  <Icon
+                    name={opt.icon}
+                    size={moderateScale(18)}
+                    color={activeSort === opt.key ? Colors.primary : Colors.textMuted}
+                    style={{ marginRight: scale(10) }}
+                  />
+                  <Text
+                    style={[
+                      styles.sortOptionText,
+                      activeSort === opt.key && styles.sortOptionTextActive,
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </View>
+                {activeSort === opt.key && (
+                  <Icon name="checkmark-circle" size={moderateScale(18)} color={Colors.primary} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -275,127 +441,126 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  header: {
+  topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: scale(20),
-    paddingTop: verticalScale(12),
-    paddingBottom: verticalScale(8),
+    paddingTop: verticalScale(10),
+    paddingBottom: verticalScale(6),
   },
-  headerSubtitle: {
-    color: Colors.textMuted,
-    fontSize: moderateScale(11),
-    fontWeight: '700',
-    letterSpacing: 1.2,
+  titleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  headerTitle: {
+  screenTitle: {
     color: Colors.textPrimary,
-    fontSize: moderateScale(24),
-    fontWeight: '800',
-    letterSpacing: 0.3,
+    fontSize: moderateScale(22),
+    fontWeight: '900',
+    letterSpacing: 0.2,
   },
-  marketStatusBadge: {
+  badgeCount: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: scale(6),
+    paddingVertical: verticalScale(1.5),
+    borderRadius: moderateScale(10),
+    marginLeft: scale(8),
+  },
+  badgeCountText: {
+    color: Colors.textSecondary,
+    fontSize: moderateScale(10),
+    fontWeight: '800',
+  },
+  topBarActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(6),
+  },
+  iconButton: {
+    width: scale(32),
+    height: scale(32),
+    borderRadius: scale(8),
+    backgroundColor: Colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  iconButtonActive: {
+    backgroundColor: 'rgba(0, 230, 118, 0.12)',
+    borderColor: 'rgba(0, 230, 118, 0.3)',
+  },
+  marketPill: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 230, 118, 0.1)',
-    paddingHorizontal: scale(10),
+    paddingHorizontal: scale(8),
     paddingVertical: verticalScale(5),
-    borderRadius: moderateScale(20),
+    borderRadius: moderateScale(12),
     borderWidth: 1,
     borderColor: 'rgba(0, 230, 118, 0.25)',
   },
-  liveIndicator: {
-    width: scale(6),
-    height: scale(6),
-    borderRadius: scale(3),
+  marketPillClosed: {
+    backgroundColor: 'rgba(255, 171, 0, 0.1)',
+    borderColor: 'rgba(255, 171, 0, 0.25)',
+  },
+  marketDot: {
+    width: scale(5),
+    height: scale(5),
+    borderRadius: scale(2.5),
     backgroundColor: Colors.primary,
-    marginRight: scale(6),
+    marginRight: scale(5),
   },
-  marketStatusText: {
+  marketDotClosed: {
+    backgroundColor: '#FFAB00',
+  },
+  marketPillText: {
     color: Colors.primary,
-    fontSize: moderateScale(10),
+    fontSize: moderateScale(9.5),
     fontWeight: '800',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
-  tickerContainer: {
-    flexDirection: 'row',
-    backgroundColor: Colors.backgroundSecondary,
-    marginHorizontal: scale(20),
-    marginVertical: verticalScale(8),
-    borderRadius: moderateScale(12),
-    paddingVertical: verticalScale(8),
-    paddingHorizontal: scale(12),
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  marketPillTextClosed: {
+    color: '#FFAB00',
   },
-  tickerItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  tickerName: {
-    color: Colors.textMuted,
-    fontSize: moderateScale(10),
-    fontWeight: '600',
-  },
-  tickerValue: {
-    color: Colors.textPrimary,
-    fontSize: moderateScale(11),
-    fontWeight: '700',
-    marginTop: verticalScale(1),
-  },
-  tickerGain: {
-    color: Colors.primary,
-    fontSize: moderateScale(10),
-    fontWeight: '700',
-  },
-  tickerLoss: {
-    color: Colors.error,
-    fontSize: moderateScale(10),
-    fontWeight: '700',
-  },
-  tickerDivider: {
-    width: 1,
-    height: '70%',
-    backgroundColor: Colors.cardBorder,
-  },
-  searchSection: {
+  searchContainer: {
     paddingHorizontal: scale(20),
-    marginTop: verticalScale(6),
+    paddingVertical: verticalScale(4),
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.inputBackground,
-    borderRadius: moderateScale(12),
-    paddingHorizontal: scale(12),
-    height: verticalScale(40),
+    borderRadius: moderateScale(10),
+    paddingHorizontal: scale(10),
+    height: verticalScale(36),
     borderWidth: 1,
     borderColor: Colors.inputBorder,
   },
   searchInput: {
     flex: 1,
     color: Colors.textPrimary,
-    fontSize: moderateScale(13),
+    fontSize: moderateScale(12.5),
     marginLeft: scale(8),
     paddingVertical: 0,
   },
-  filterRow: {
+  filterStrip: {
     flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: scale(20),
-    marginTop: verticalScale(12),
-    marginBottom: verticalScale(8),
+    paddingVertical: verticalScale(6),
+  },
+  filterScroll: {
+    gap: scale(6),
+    paddingRight: scale(10),
   },
   filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.card,
-    paddingHorizontal: scale(12),
-    paddingVertical: verticalScale(6),
-    borderRadius: moderateScale(16),
-    marginRight: scale(8),
+    paddingHorizontal: scale(10),
+    paddingVertical: verticalScale(4.5),
+    borderRadius: moderateScale(8),
     borderWidth: 1,
     borderColor: Colors.cardBorder,
   },
@@ -403,49 +568,133 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 230, 118, 0.15)',
     borderColor: Colors.primary,
   },
-  chipIcon: {
-    marginRight: scale(4),
+  emojiIcon: {
+    fontSize: moderateScale(10),
+    marginRight: scale(3),
   },
-  filterText: {
+  filterChipText: {
     color: Colors.textMuted,
-    fontSize: moderateScale(12),
+    fontSize: moderateScale(11),
     fontWeight: '600',
   },
-  filterTextActive: {
+  filterChipTextActive: {
     color: Colors.primary,
-    fontWeight: '700',
+    fontWeight: '800',
+  },
+  pillModeButton: {
+    width: scale(28),
+    height: scale(26),
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: moderateScale(6),
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    marginLeft: scale(6),
+  },
+  pillModeText: {
+    color: Colors.textPrimary,
+    fontSize: moderateScale(11),
+    fontWeight: '800',
   },
   listContent: {
     paddingHorizontal: scale(20),
-    paddingTop: verticalScale(6),
+    paddingTop: verticalScale(4),
     paddingBottom: verticalScale(100),
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    color: Colors.textMuted,
-    fontSize: moderateScale(13),
-    marginTop: verticalScale(12),
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: verticalScale(60),
+    paddingTop: verticalScale(40),
+    paddingHorizontal: scale(30),
+  },
+  emptyIconCircle: {
+    width: scale(50),
+    height: scale(50),
+    borderRadius: scale(25),
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: verticalScale(12),
   },
   emptyTitle: {
     color: Colors.textPrimary,
-    fontSize: moderateScale(16),
-    fontWeight: '700',
-    marginTop: verticalScale(12),
+    fontSize: moderateScale(15),
+    fontWeight: '800',
   },
   emptySubtitle: {
     color: Colors.textMuted,
-    fontSize: moderateScale(12),
-    marginTop: verticalScale(4),
+    fontSize: moderateScale(11.5),
+    marginTop: verticalScale(3),
     textAlign: 'center',
-    paddingHorizontal: scale(30),
+  },
+  resetButton: {
+    marginTop: verticalScale(14),
+    backgroundColor: 'rgba(0, 230, 118, 0.12)',
+    paddingHorizontal: scale(14),
+    paddingVertical: verticalScale(6),
+    borderRadius: moderateScale(8),
+    borderWidth: 1,
+    borderColor: 'rgba(0, 230, 118, 0.25)',
+  },
+  resetButtonText: {
+    color: Colors.primary,
+    fontSize: moderateScale(11.5),
+    fontWeight: '800',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: Colors.card,
+    borderTopLeftRadius: moderateScale(22),
+    borderTopRightRadius: moderateScale(22),
+    paddingHorizontal: scale(20),
+    paddingTop: verticalScale(12),
+    paddingBottom: verticalScale(30),
+    borderTopWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  modalHandle: {
+    width: scale(36),
+    height: verticalScale(4),
+    backgroundColor: Colors.cardBorder,
+    borderRadius: moderateScale(2),
+    alignSelf: 'center',
+    marginBottom: verticalScale(14),
+  },
+  modalTitle: {
+    color: Colors.textPrimary,
+    fontSize: moderateScale(17),
+    fontWeight: '800',
+    marginBottom: verticalScale(14),
+  },
+  sortOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: verticalScale(12),
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  sortOptionRowActive: {
+    backgroundColor: 'rgba(0, 230, 118, 0.06)',
+    borderRadius: moderateScale(8),
+    paddingHorizontal: scale(8),
+  },
+  sortOptionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sortOptionText: {
+    color: Colors.textSecondary,
+    fontSize: moderateScale(13.5),
+    fontWeight: '600',
+  },
+  sortOptionTextActive: {
+    color: Colors.primary,
+    fontWeight: '800',
   },
 });
