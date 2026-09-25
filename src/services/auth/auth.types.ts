@@ -96,3 +96,50 @@ export interface ApiErrorResponse {
   msg?: string;
   message?: string;
 }
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ForgotPasswordResponse {
+  success: boolean;
+  msg: string;
+  otp?: string;
+}
+
+export interface ResetPasswordRequest {
+  email: string;
+  otp: string;
+  new_password: string;
+}
+
+export interface ResetPasswordResponse {
+  success: boolean;
+  msg: string;
+}
+
+export interface ForgotPinRequest {
+  email: string;
+}
+
+export interface ForgotPinResponse {
+  success: boolean;
+  msg: string;
+  otp?: string;
+}
+
+export interface ResetPinRequest {
+  email: string;
+  otp: string;
+  new_pin: string;
+}
+
+export interface ResetPinResponse {
+  success: boolean;
+  msg: string;
+  socket_tokens?: {
+    socket_access_token: string;
+    socket_refresh_token: string;
+  };
+}
+

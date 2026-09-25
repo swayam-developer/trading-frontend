@@ -37,6 +37,10 @@ export interface AuthState {
   checkBiometrics: () => Promise<{ available: boolean; biometryType: string | null; enrolled: boolean }>;
   enrollBiometrics: () => Promise<void>;
   verifyBiometrics: () => Promise<boolean>;
+  forgotPassword: (email: string) => Promise<{ msg: string; otp?: string }>;
+  resetPassword: (email: string, otp: string, newPassword: string) => Promise<string>;
+  forgotPin: (email: string) => Promise<{ msg: string; otp?: string }>;
+  resetPin: (email: string, otp: string, newPin: string) => Promise<string>;
   restoreSession: (session: any) => void;
   logout: () => Promise<void>;
   clearError: () => void;

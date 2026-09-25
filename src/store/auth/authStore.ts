@@ -376,6 +376,77 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
+  forgotPassword: async (email: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await authApi.forgotPassword({ email: email.trim().toLowerCase() });
+      set({ isLoading: false });
+      return { msg: res.msg, otp: res.otp };
+    } catch (err) {
+      const msg = extractErrorMessage(err);
+      set({ isLoading: false, error: msg });
+      throw new Error(msg);
+    }
+  },
+
+  resetPassword: async (email: string, otp: string, newPassword: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await authApi.resetPassword({
+        email: email.trim().toLowerCase(),
+        otp: otp.trim(),
+        new_password: newPassword,
+      });
+      set({ isLoading: false });
+      return res.msg;
+    } catch (err) {
+      const msg = extractErrorMessage(err);
+      set({ isLoading: false, error: msg });
+      throw new Error(msg);
+    }
+  },
+
+  forgotPin: async (email: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await authApi.forgotPin({ email: email.trim().toLowerCase() });
+      set({ isLoading: false });
+      return { msg: res.msg, otp: res.otp };
+    } catch (err) {
+      const msg = extractErrorMessage(err);
+      set({ isLoading: false, error: msg });
+      throw new Error(msg);
+    }
+  },
+
+  resetPin: async (email: string, otp: string, newPin: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await authApi.resetPin({
+        email: email.trim().toLowerCase(),
+        otp: otp.trim(),
+        new_pin: newPin.trim(),
+      });
+      if (res.socket_tokens) {
+        setSocketTokens(
+          res.socket_tokens.socket_access_token,
+          res.socket_tokens.socket_refresh_token
+        );
+      }
+      set({
+        isLoading: false,
+        hasPin: true,
+        socketTokens: res.socket_tokens || null,
+      });
+      persistSession({ hasPin: true });
+      return res.msg;
+    } catch (err) {
+      const msg = extractErrorMessage(err);
+      set({ isLoading: false, error: msg });
+      throw new Error(msg);
+    }
+  },
+
 
   restoreSession: (session: StoredSession) => {
     if (session?.tokens?.access_token) {

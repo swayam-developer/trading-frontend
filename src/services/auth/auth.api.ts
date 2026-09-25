@@ -72,4 +72,37 @@ export const authApi = {
     const response = await apiClient.post<RefreshTokenResponse>('/auth/refresh-token', data);
     return response.data;
   },
+
+  /**
+   * Send OTP to email for password reset
+   */
+  forgotPassword: async (data: { email: string }) => {
+    const response = await apiClient.post('/auth/forgot-password', data);
+    return response.data;
+  },
+
+  /**
+   * Verify OTP and set a new account password
+   */
+  resetPassword: async (data: { email: string; otp: string; new_password: string }) => {
+    const response = await apiClient.post('/auth/reset-password', data);
+    return response.data;
+  },
+
+  /**
+   * Send OTP to email for MPIN reset
+   */
+  forgotPin: async (data: { email: string }) => {
+    const response = await apiClient.post('/auth/forgot-pin', data);
+    return response.data;
+  },
+
+  /**
+   * Verify OTP and set a new 4-digit MPIN
+   */
+  resetPin: async (data: { email: string; otp: string; new_pin: string }) => {
+    const response = await apiClient.post('/auth/reset-pin', data);
+    return response.data;
+  },
 };
+

@@ -24,6 +24,7 @@ export const VerifyPinScreen: React.FC = () => {
     enrollBiometrics,
     checkBiometrics,
     fetchProfile,
+    forgotPin,
     isBiometricsAvailable,
     isBiometricEnrolled,
     biometryType,
@@ -135,6 +136,39 @@ export const VerifyPinScreen: React.FC = () => {
   const handleSwitchAccount = async () => {
     await logout();
     navigation.replace('EmailCheck');
+  };
+
+  const handleForgotPin = async () => {
+    const targetEmail = profile?.email || user?.email || useAuthStore.getState().pendingEmail;
+    if (!targetEmail) {
+      Toast.show({
+        type: 'error',
+        text1: 'Email Not Found',
+        text2: 'Please sign in with your email again.',
+      });
+      navigation.replace('EmailCheck');
+      return;
+    }
+
+    try {
+      const res = await forgotPin(targetEmail);
+      Toast.show({
+        type: 'info',
+        text1: 'Reset Code Sent',
+        text2: res.msg || `A 6-digit MPIN reset code was sent to ${targetEmail}`,
+      });
+      navigation.navigate('VerifyOtp', {
+        email: targetEmail,
+        otp_type: 'reset_pin',
+        testOtp: res?.otp,
+      });
+    } catch (err: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Request Failed',
+        text2: err.message || 'Unable to send MPIN reset code.',
+      });
+    }
   };
 
   const handleReEnrollBiometrics = async () => {
@@ -282,13 +316,26 @@ export const VerifyPinScreen: React.FC = () => {
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity
-          style={styles.switchButton}
-          onPress={handleSwitchAccount}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.switchText}>Switch Account or Reset PIN</Text>
-        </TouchableOpacity>
+        <View style={styles.bottomLinksRow}>
+          <TouchableOpacity
+            style={styles.forgotPinButton}
+            onPress={handleForgotPin}
+            activeOpacity={0.7}
+          >
+            <Icon name="key-outline" size={moderateScale(13)} color={Colors.secondary} style={{ marginRight: 4 }} />
+            <Text style={styles.forgotPinText}>Forgot MPIN?</Text>
+          </TouchableOpacity>
+
+          <View style={styles.linkDot} />
+
+          <TouchableOpacity
+            style={styles.switchButton}
+            onPress={handleSwitchAccount}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.switchText}>Switch Account</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -458,11 +505,36 @@ const styles = StyleSheet.create({
   },
   switchButton: {
     alignItems: 'center',
-    paddingVertical: verticalScale(8),
+    paddingVertical: verticalScale(6),
+    paddingHorizontal: scale(8),
   },
   switchText: {
-    color: Colors.secondary,
+    color: Colors.textMuted,
     fontSize: moderateScale(12),
     fontWeight: '500',
+  },
+  bottomLinksRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: verticalScale(6),
+  },
+  forgotPinButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: verticalScale(6),
+    paddingHorizontal: scale(8),
+  },
+  forgotPinText: {
+    color: Colors.secondary,
+    fontSize: moderateScale(12.5),
+    fontWeight: '600',
+  },
+  linkDot: {
+    width: scale(3),
+    height: scale(3),
+    borderRadius: scale(1.5),
+    backgroundColor: Colors.textMuted,
+    marginHorizontal: scale(4),
   },
 });

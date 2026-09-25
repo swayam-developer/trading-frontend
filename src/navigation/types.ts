@@ -25,6 +25,14 @@ export type RootStackParamList = {
   Login: {
     email: string;
   };
+  ResetPassword: {
+    email: string;
+    otp: string;
+  };
+  ResetPin: {
+    email: string;
+    otp: string;
+  };
   SetPin: undefined;
   VerifyPin: undefined;
   Dashboard: undefined;

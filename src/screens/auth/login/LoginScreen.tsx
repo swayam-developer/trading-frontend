@@ -30,7 +30,7 @@ export const LoginScreen: React.FC = () => {
 
   const {
     login,
-    sendOtp,
+    forgotPassword,
     isLoading,
     isBiometricsAvailable,
     isBiometricEnrolled,
@@ -103,18 +103,22 @@ export const LoginScreen: React.FC = () => {
 
   const handleForgotPassword = async () => {
     try {
-      await sendOtp(email, 'reset_password');
+      const res = await forgotPassword(email);
       Toast.show({
         type: 'info',
         text1: 'Reset Code Sent',
-        text2: `A reset OTP was sent to ${email}`,
+        text2: res.msg || `A password reset code was sent to ${email}`,
       });
-      navigation.navigate('VerifyOtp', { email, otp_type: 'reset_password' });
+      navigation.navigate('VerifyOtp', {
+        email,
+        otp_type: 'reset_password',
+        testOtp: res?.otp,
+      });
     } catch (err: any) {
       Toast.show({
         type: 'error',
-        text1: 'Error',
-        text2: err.message || 'Unable to send reset OTP.',
+        text1: 'Request Failed',
+        text2: err.message || 'Unable to send password reset code.',
       });
     }
   };

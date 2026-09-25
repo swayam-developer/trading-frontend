@@ -25,6 +25,7 @@ export const VerifyOtpScreen: React.FC = () => {
   const route = useRoute<RootRouteProp<'VerifyOtp'>>();
   const { email, otp_type = 'email', testOtp } = route.params;
 
+  const [localTestOtp, setLocalTestOtp] = useState<string | undefined>(testOtp);
   const [otpArray, setOtpArray] = useState<string[]>(() => {
     if (testOtp && testOtp.length === 6) {
       return testOtp.split('');
@@ -36,7 +37,7 @@ export const VerifyOtpScreen: React.FC = () => {
   const [canResend, setCanResend] = useState(false);
 
   const inputRefs = useRef<any[]>([]);
-  const { verifyOtp, sendOtp, isLoading } = useAuthStore();
+  const { verifyOtp, sendOtp, forgotPassword, forgotPin, isLoading } = useAuthStore();
 
   const currentOtp = otpArray.join('');
 
@@ -102,12 +103,12 @@ export const VerifyOtpScreen: React.FC = () => {
   };
 
   const handleAutoFillTestOtp = () => {
-    if (testOtp && testOtp.length === 6) {
-      setOtpArray(testOtp.split(''));
+    if (localTestOtp && localTestOtp.length === 6) {
+      setOtpArray(localTestOtp.split(''));
       Toast.show({
         type: 'success',
         text1: 'Code Auto-filled',
-        text2: `Filled code: ${testOtp}`,
+        text2: `Filled code: ${localTestOtp}`,
       });
       inputRefs.current[5]?.focus();
       setActiveIndex(5);
@@ -120,6 +121,32 @@ export const VerifyOtpScreen: React.FC = () => {
         type: 'error',
         text1: 'Incomplete Code',
         text2: 'Please enter all 6 digits of the OTP code.',
+      });
+      return;
+    }
+
+    if (otp_type === 'reset_password') {
+      Toast.show({
+        type: 'success',
+        text1: 'Code Entered',
+        text2: 'Set your new account password.',
+      });
+      navigation.navigate('ResetPassword', {
+        email,
+        otp: currentOtp,
+      });
+      return;
+    }
+
+    if (otp_type === 'reset_pin') {
+      Toast.show({
+        type: 'success',
+        text1: 'Code Entered',
+        text2: 'Set your new 4-digit MPIN.',
+      });
+      navigation.navigate('ResetPin', {
+        email,
+        otp: currentOtp,
       });
       return;
     }
@@ -149,7 +176,22 @@ export const VerifyOtpScreen: React.FC = () => {
     if (!canResend) return;
 
     try {
-      await sendOtp(email, otp_type);
+      let sentOtp: string | undefined;
+
+      if (otp_type === 'reset_password') {
+        const res = await forgotPassword(email);
+        sentOtp = res.otp;
+      } else if (otp_type === 'reset_pin') {
+        const res = await forgotPin(email);
+        sentOtp = res.otp;
+      } else {
+        await sendOtp(email, otp_type);
+      }
+
+      if (sentOtp) {
+        setLocalTestOtp(sentOtp);
+      }
+
       setCountdown(60);
       setCanResend(false);
       setOtpArray(['', '', '', '', '', '']);
@@ -200,14 +242,24 @@ export const VerifyOtpScreen: React.FC = () => {
         <AuraLogo size={50} showTagline={false} />
 
         <View style={styles.card}>
-          <Text style={styles.title}>Verify Email Code</Text>
+          <Text style={styles.title}>
+            {otp_type === 'reset_password'
+              ? 'Reset Password Code'
+              : otp_type === 'reset_pin'
+              ? 'Reset MPIN Code'
+              : 'Verify Email Code'}
+          </Text>
           <Text style={styles.subtitle}>
-            Enter the 6-digit security code sent to{' '}
+            {otp_type === 'reset_password'
+              ? `Enter the 6-digit verification code to reset the password for `
+              : otp_type === 'reset_pin'
+              ? `Enter the 6-digit verification code to reset the MPIN for `
+              : `Enter the 6-digit security code sent to `}
             <Text style={styles.emailHighlight}>{email}</Text>
           </Text>
 
           {/* Test Mode Banner */}
-          {testOtp ? (
+          {localTestOtp ? (
             <TouchableOpacity
               style={styles.testOtpBanner}
               onPress={handleAutoFillTestOtp}
@@ -222,7 +274,7 @@ export const VerifyOtpScreen: React.FC = () => {
               </View>
               <View style={styles.testCodeRow}>
                 <Text style={styles.testOtpLabel}>Verification Code:</Text>
-                <Text style={styles.testOtpCode}>{testOtp}</Text>
+                <Text style={styles.testOtpCode}>{localTestOtp}</Text>
               </View>
             </TouchableOpacity>
           ) : null}

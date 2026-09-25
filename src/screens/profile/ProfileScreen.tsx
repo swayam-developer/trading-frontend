@@ -79,6 +79,38 @@ export const ProfileScreen: React.FC = () => {
     });
   };
 
+  const handleResetMpin = async () => {
+    const targetEmail = profile?.email || user?.email;
+    if (!targetEmail) {
+      Toast.show({
+        type: 'error',
+        text1: 'Email Not Found',
+        text2: 'Could not resolve user email.',
+      });
+      return;
+    }
+
+    try {
+      const res = await useAuthStore.getState().forgotPin(targetEmail);
+      Toast.show({
+        type: 'info',
+        text1: 'Reset Code Sent',
+        text2: res.msg || `A 6-digit MPIN reset code was sent to ${targetEmail}`,
+      });
+      navigation.getParent<any>()?.navigate('VerifyOtp', {
+        email: targetEmail,
+        otp_type: 'reset_pin',
+        testOtp: res?.otp,
+      });
+    } catch (err: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Request Failed',
+        text2: err.message || 'Unable to send MPIN reset code.',
+      });
+    }
+  };
+
   const handleLogout = () => {
     Alert.alert(
       'Sign Out',
@@ -227,9 +259,13 @@ export const ProfileScreen: React.FC = () => {
               <Text style={styles.settingTitle}>4-Digit Login PIN</Text>
               <Text style={styles.settingSubtitle}>Hardware Encrypted Protection</Text>
             </View>
-            <View style={styles.activePill}>
-              <Text style={styles.activePillText}>Protected ✓</Text>
-            </View>
+            <TouchableOpacity
+              style={styles.resetPinChip}
+              onPress={handleResetMpin}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.resetPinChipText}>Reset</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.settingDivider} />
@@ -619,6 +655,19 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontSize: moderateScale(10),
     fontWeight: '800',
+  },
+  resetPinChip: {
+    backgroundColor: 'rgba(0, 229, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 229, 255, 0.3)',
+    paddingHorizontal: scale(10),
+    paddingVertical: verticalScale(4),
+    borderRadius: moderateScale(6),
+  },
+  resetPinChipText: {
+    color: Colors.secondary,
+    fontSize: moderateScale(11),
+    fontWeight: '700',
   },
   liveServerBadge: {
     flexDirection: 'row',
