@@ -14,7 +14,7 @@ interface HoldingCardProps {
   onTogglePillMode?: () => void;
 }
 
-export const HoldingCard: React.FC<HoldingCardProps> = ({
+const HoldingCardComponent: React.FC<HoldingCardProps> = ({
   holding,
   onTrade,
   pillDisplayMode = 'dollar',
@@ -64,20 +64,20 @@ export const HoldingCard: React.FC<HoldingCardProps> = ({
         <StockAvatar
           symbol={symbol}
           iconUrl={stock?.iconUrl}
-          size={scale(42)}
-          borderRadius={scale(14)}
+          size={scale(40)}
+          borderRadius={scale(12)}
           style={styles.avatarSpacing}
         />
 
         {/* Security Name & Shares */}
         <View style={styles.stockInfo}>
           <View style={styles.symbolRow}>
-            <Text style={styles.symbolText}>{symbol}</Text>
+            <Text style={styles.symbolText} numberOfLines={1}>{symbol}</Text>
             <View style={styles.sharesBadge}>
               <Text style={styles.sharesBadgeText}>{holding.quantity} Shs</Text>
             </View>
           </View>
-          <Text style={styles.companyText} numberOfLines={1}>
+          <Text style={styles.companyText} numberOfLines={1} ellipsizeMode="tail">
             {stock?.companyName || 'Registered Security'}
           </Text>
         </View>
@@ -87,7 +87,7 @@ export const HoldingCard: React.FC<HoldingCardProps> = ({
           <MiniSparkline
             data={sparklineData}
             isPositive={isPositive}
-            width={scale(50)}
+            width={scale(48)}
             height={verticalScale(22)}
             strokeWidth={1.6}
           />
@@ -95,7 +95,7 @@ export const HoldingCard: React.FC<HoldingCardProps> = ({
 
         {/* Current Valuation & Tappable P&L Pill */}
         <View style={styles.valuationContainer}>
-          <Text style={styles.currentValueText}>
+          <Text style={styles.currentValueText} numberOfLines={1}>
             ${totalValue.toLocaleString('en-US', {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
@@ -115,7 +115,7 @@ export const HoldingCard: React.FC<HoldingCardProps> = ({
             >
               <Icon
                 name={isPositive ? 'caret-up' : 'caret-down'}
-                size={moderateScale(9)}
+                size={moderateScale(8.5)}
                 color={isPositive ? Colors.primary : Colors.error}
               />
               <Text
@@ -162,6 +162,21 @@ export const HoldingCard: React.FC<HoldingCardProps> = ({
   );
 };
 
+export const HoldingCard = React.memo<HoldingCardProps>(
+  HoldingCardComponent,
+  (prev, next) => {
+    return (
+      prev.holding._id === next.holding._id &&
+      prev.holding.quantity === next.holding.quantity &&
+      prev.holding.buyPrice === next.holding.buyPrice &&
+      prev.holding.stock?._id === next.holding.stock?._id &&
+      prev.holding.stock?.currentPrice === next.holding.stock?.currentPrice &&
+      prev.holding.stock?.lastDayTradedPrice === next.holding.stock?.lastDayTradedPrice &&
+      prev.pillDisplayMode === next.pillDisplayMode
+    );
+  }
+);
+
 const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.card,
@@ -184,8 +199,10 @@ const styles = StyleSheet.create({
     marginRight: scale(10),
   },
   stockInfo: {
-    flex: 1.2,
+    flex: 1,
+    minWidth: 0,
     justifyContent: 'center',
+    marginRight: scale(6),
   },
   symbolRow: {
     flexDirection: 'row',
@@ -193,47 +210,54 @@ const styles = StyleSheet.create({
   },
   symbolText: {
     color: Colors.textPrimary,
-    fontSize: moderateScale(15),
+    fontSize: moderateScale(14.5),
     fontWeight: '800',
     letterSpacing: 0.3,
+    flexShrink: 1,
   },
   sharesBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    paddingHorizontal: scale(5),
+    paddingHorizontal: scale(4.5),
     paddingVertical: verticalScale(1),
     borderRadius: moderateScale(4),
-    marginLeft: scale(6),
+    marginLeft: scale(5),
+    flexShrink: 0,
   },
   sharesBadgeText: {
     color: Colors.textSecondary,
-    fontSize: moderateScale(9),
+    fontSize: moderateScale(8.5),
     fontWeight: '700',
   },
   companyText: {
     color: Colors.textMuted,
-    fontSize: moderateScale(11),
+    fontSize: moderateScale(10.5),
     marginTop: verticalScale(2),
   },
   sparklineWrap: {
+    width: scale(48),
+    height: verticalScale(22),
+    alignItems: 'center',
+    justifyContent: 'center',
     marginHorizontal: scale(4),
+    flexShrink: 0,
   },
   valuationContainer: {
     alignItems: 'flex-end',
     justifyContent: 'center',
     flexShrink: 0,
-    minWidth: scale(88),
+    minWidth: scale(80),
   },
   currentValueText: {
     color: Colors.textPrimary,
-    fontSize: moderateScale(15),
+    fontSize: moderateScale(14.5),
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
   pnlBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: scale(6),
-    paddingVertical: verticalScale(2.5),
+    paddingHorizontal: scale(5.5),
+    paddingVertical: verticalScale(2),
     borderRadius: moderateScale(5),
     marginTop: verticalScale(3),
   },
@@ -244,7 +268,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 82, 82, 0.12)',
   },
   pnlText: {
-    fontSize: moderateScale(10.5),
+    fontSize: moderateScale(10),
     fontWeight: '800',
     marginLeft: scale(2),
     fontVariant: ['tabular-nums'],

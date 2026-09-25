@@ -46,7 +46,10 @@ export const StockDetailScreen: React.FC = () => {
   const route = useRoute<RootRouteProp<'StockDetail'>>();
   const { stock: initialStock } = route.params;
 
-  const { holdings, selectedStock, setSelectedStock, fetchStockDetail } = useStockStore();
+  const holdings = useStockStore((s) => s.holdings);
+  const selectedStock = useStockStore((s) => s.selectedStock);
+  const setSelectedStock = useStockStore((s) => s.setSelectedStock);
+  const fetchStockDetail = useStockStore((s) => s.fetchStockDetail);
   const [selectedTimeframe, setSelectedTimeframe] = useState<TimeFrame>('1D');
   const [tradeModalVisible, setTradeModalVisible] = useState(false);
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');

@@ -11,7 +11,7 @@ interface OrderCardProps {
   onPress?: () => void;
 }
 
-export const OrderCard: React.FC<OrderCardProps> = ({ order, onPress }) => {
+const OrderCardComponent: React.FC<OrderCardProps> = ({ order, onPress }) => {
   const isBuy = order.type === 'buy';
   const totalAmount = order.quantity * order.price;
   const isAMO = order.status === 'PENDING_AMO' || (order as any).isAMO;
@@ -160,6 +160,21 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onPress }) => {
     </TouchableOpacity>
   );
 };
+
+export const OrderCard = React.memo<OrderCardProps>(
+  OrderCardComponent,
+  (prev, next) => {
+    return (
+      prev.order._id === next.order._id &&
+      prev.order.status === next.order.status &&
+      prev.order.price === next.order.price &&
+      prev.order.quantity === next.order.quantity &&
+      prev.order.type === next.order.type &&
+      prev.order.remainingBalance === next.order.remainingBalance &&
+      prev.order.timestamp === next.order.timestamp
+    );
+  }
+);
 
 const styles = StyleSheet.create({
   card: {

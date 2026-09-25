@@ -16,7 +16,7 @@ interface AssetAllocationChartProps {
   totalValue: number;
 }
 
-export const AssetAllocationChart: React.FC<AssetAllocationChartProps> = ({
+const AssetAllocationChartComponent: React.FC<AssetAllocationChartProps> = ({
   slices,
   totalValue,
 }) => {
@@ -125,6 +125,8 @@ export const AssetAllocationChart: React.FC<AssetAllocationChartProps> = ({
     </View>
   );
 };
+
+export const AssetAllocationChart = React.memo<AssetAllocationChartProps>(AssetAllocationChartComponent);
 
 const styles = StyleSheet.create({
   card: {

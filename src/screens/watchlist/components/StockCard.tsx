@@ -20,7 +20,7 @@ interface StockCardProps {
   onTogglePillMode?: () => void;
 }
 
-export const StockCard: React.FC<StockCardProps> = ({
+const StockCardComponent: React.FC<StockCardProps> = ({
   stock,
   onPress,
   pillDisplayMode = 'percent',
@@ -82,14 +82,6 @@ export const StockCard: React.FC<StockCardProps> = ({
     return undefined;
   }, [stock.dayTimeSeries]);
 
-  // Exchange tag based on symbol
-  const exchange = React.useMemo(() => {
-    const sym = stock.symbol.toUpperCase();
-    if (['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX'].includes(sym)) {
-      return 'NASDAQ';
-    }
-    return 'NYSE';
-  }, [stock.symbol]);
 
   const handlePillPress = () => {
     if (onTogglePillMode) {
@@ -117,22 +109,16 @@ export const StockCard: React.FC<StockCardProps> = ({
       <StockAvatar
         symbol={stock.symbol}
         iconUrl={stock.iconUrl}
-        size={scale(44)}
-        borderRadius={scale(14)}
+        size={scale(40)}
+        borderRadius={scale(12)}
         style={styles.avatarSpacing}
       />
 
       {/* Symbol & Info Column */}
       <View style={styles.symbolInfo}>
-        <View style={styles.symbolRow}>
-          <Text style={styles.symbolText} numberOfLines={1}>
-            {stock.symbol}
-          </Text>
-          <View style={styles.exchangeBadge}>
-            <Text style={styles.exchangeText}>{exchange}</Text>
-          </View>
-        </View>
-
+        <Text style={styles.symbolText} numberOfLines={1} ellipsizeMode="tail">
+          {stock.symbol}
+        </Text>
         <Text style={styles.companyText} numberOfLines={1} ellipsizeMode="tail">
           {stock.companyName}
         </Text>
@@ -143,7 +129,7 @@ export const StockCard: React.FC<StockCardProps> = ({
         <MiniSparkline
           data={sparklineData}
           isPositive={isPositive}
-          width={scale(56)}
+          width={scale(50)}
           height={verticalScale(24)}
           strokeWidth={1.7}
         />
@@ -173,7 +159,7 @@ export const StockCard: React.FC<StockCardProps> = ({
           >
             <Icon
               name={isPositive ? 'caret-up' : 'caret-down'}
-              size={moderateScale(9)}
+              size={moderateScale(8.5)}
               color={isPositive ? Colors.primary : Colors.error}
               style={styles.caret}
             />
@@ -194,6 +180,22 @@ export const StockCard: React.FC<StockCardProps> = ({
   );
 };
 
+export const StockCard = React.memo<StockCardProps>(
+  StockCardComponent,
+  (prev, next) => {
+    return (
+      prev.stock._id === next.stock._id &&
+      prev.stock.symbol === next.stock.symbol &&
+      prev.stock.currentPrice === next.stock.currentPrice &&
+      prev.stock.lastDayTradedPrice === next.stock.lastDayTradedPrice &&
+      prev.pillDisplayMode === next.pillDisplayMode &&
+      prev.stock.iconUrl === next.stock.iconUrl &&
+      prev.stock.companyName === next.stock.companyName &&
+      prev.stock.dayTimeSeries === next.stock.dayTimeSeries
+    );
+  }
+);
+
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
@@ -201,7 +203,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.card,
     borderRadius: moderateScale(16),
     paddingHorizontal: scale(14),
-    paddingVertical: verticalScale(13),
+    paddingVertical: verticalScale(12),
     marginBottom: verticalScale(10),
     borderWidth: 1,
     borderColor: Colors.cardBorder,
@@ -212,34 +214,18 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   avatarSpacing: {
-    marginRight: scale(12),
+    marginRight: scale(10),
   },
   symbolInfo: {
-    flex: 1.2,
+    flex: 1,
+    minWidth: 0,
     justifyContent: 'center',
-    marginRight: scale(6),
-  },
-  symbolRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginRight: scale(8),
   },
   symbolText: {
     color: Colors.textPrimary,
-    fontSize: moderateScale(16),
+    fontSize: moderateScale(15),
     fontWeight: '800',
-    letterSpacing: 0.4,
-  },
-  exchangeBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    paddingHorizontal: scale(5),
-    paddingVertical: verticalScale(1),
-    borderRadius: moderateScale(4),
-    marginLeft: scale(6),
-  },
-  exchangeText: {
-    color: Colors.textMuted,
-    fontSize: moderateScale(8.5),
-    fontWeight: '700',
     letterSpacing: 0.3,
   },
   companyText: {
@@ -249,16 +235,18 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   sparklineContainer: {
-    width: scale(58),
+    width: scale(50),
+    height: verticalScale(24),
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: scale(4),
+    flexShrink: 0,
   },
   priceColumn: {
     alignItems: 'flex-end',
     justifyContent: 'center',
     flexShrink: 0,
-    minWidth: scale(88),
+    minWidth: scale(82),
   },
   priceFlashWrap: {
     borderRadius: moderateScale(4),
@@ -267,7 +255,7 @@ const styles = StyleSheet.create({
   },
   priceValue: {
     color: Colors.textPrimary,
-    fontSize: moderateScale(15),
+    fontSize: moderateScale(14.5),
     fontWeight: '800',
     letterSpacing: 0.2,
     fontVariant: ['tabular-nums'],
@@ -275,9 +263,9 @@ const styles = StyleSheet.create({
   changeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: scale(7),
-    paddingVertical: verticalScale(3),
-    borderRadius: moderateScale(6),
+    paddingHorizontal: scale(6),
+    paddingVertical: verticalScale(2.5),
+    borderRadius: moderateScale(5),
     marginTop: verticalScale(3),
   },
   changeBadgeUp: {
@@ -287,10 +275,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 82, 82, 0.12)',
   },
   caret: {
-    marginRight: scale(3),
+    marginRight: scale(2.5),
   },
   changePercentText: {
-    fontSize: moderateScale(11),
+    fontSize: moderateScale(10.5),
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },

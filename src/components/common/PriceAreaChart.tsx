@@ -34,7 +34,7 @@ interface PriceAreaChartProps {
   onScrub?: (point: ChartPoint | null) => void;
 }
 
-export const PriceAreaChart: React.FC<PriceAreaChartProps> = ({
+const PriceAreaChartComponent: React.FC<PriceAreaChartProps> = ({
   data,
   height = verticalScale(195),
   width: propWidth,
@@ -51,10 +51,7 @@ export const PriceAreaChart: React.FC<PriceAreaChartProps> = ({
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   const activeColor = color || (isPositive ? Colors.primary : Colors.error);
-  const activeGradientId = useMemo(
-    () => `chartGrad_${Math.random().toString(36).substring(2, 9)}`,
-    []
-  );
+  const activeGradientId = isPositive ? 'mainChartGrad_pos' : 'mainChartGrad_neg';
 
   // SVG inner chart margins
   const paddingTop = verticalScale(18);
@@ -364,6 +361,8 @@ export const PriceAreaChart: React.FC<PriceAreaChartProps> = ({
     </View>
   );
 };
+
+export const PriceAreaChart = React.memo<PriceAreaChartProps>(PriceAreaChartComponent);
 
 const styles = StyleSheet.create({
   container: {

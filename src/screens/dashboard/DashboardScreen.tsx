@@ -17,7 +17,10 @@ import { StockAvatar } from '../../components/common/StockAvatar';
 
 export const DashboardScreen: React.FC = () => {
   const navigation = useNavigation<RootNavigationProp<'Dashboard'>>();
-  const { user, profile, fetchProfile, logout } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  const profile = useAuthStore((s) => s.profile);
+  const fetchProfile = useAuthStore((s) => s.fetchProfile);
+  const logout = useAuthStore((s) => s.logout);
 
   useEffect(() => {
     fetchProfile();

@@ -50,7 +50,7 @@ const INDICES_DATA: MarketIndexItem[] = [
   },
 ];
 
-export const MarketIndicesStrip: React.FC = () => {
+const MarketIndicesStripComponent: React.FC = () => {
   return (
     <View style={styles.container}>
       <ScrollView
@@ -89,6 +89,8 @@ export const MarketIndicesStrip: React.FC = () => {
     </View>
   );
 };
+
+export const MarketIndicesStrip = React.memo(MarketIndicesStripComponent);
 
 const styles = StyleSheet.create({
   container: {

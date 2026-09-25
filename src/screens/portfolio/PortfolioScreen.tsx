@@ -34,9 +34,16 @@ type HoldingSort = 'value_desc' | 'pnl_desc' | 'pnl_asc' | 'shares_desc' | 'symb
 export const PortfolioScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<MainTabNavigationProp<'Portfolio'>>();
-  const { holdings, isLoadingHoldings, fetchHoldings, fetchStocks, setSelectedStock } =
-    useStockStore();
-  const { profile, fetchProfile } = useAuthStore();
+
+  // Fine-grained selectors for optimal re-render performance
+  const holdings = useStockStore((s) => s.holdings);
+  const isLoadingHoldings = useStockStore((s) => s.isLoadingHoldings);
+  const fetchHoldings = useStockStore((s) => s.fetchHoldings);
+  const fetchStocks = useStockStore((s) => s.fetchStocks);
+  const setSelectedStock = useStockStore((s) => s.setSelectedStock);
+
+  const profile = useAuthStore((s) => s.profile);
+  const fetchProfile = useAuthStore((s) => s.fetchProfile);
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [holdingSearch, setHoldingSearch] = useState('');
@@ -71,12 +78,19 @@ export const PortfolioScreen: React.FC = () => {
     setIsRefreshing(false);
   }, [fetchHoldings, fetchStocks, fetchProfile]);
 
-  const handleTrade = (holding: Holding) => {
-    if (holding.stock) {
-      setSelectedStock(holding.stock);
-      navigation.navigate('StockDetail', { stock: holding.stock });
-    }
-  };
+  const handleTrade = useCallback(
+    (holding: Holding) => {
+      if (holding.stock) {
+        setSelectedStock(holding.stock);
+        navigation.navigate('StockDetail', { stock: holding.stock });
+      }
+    },
+    [setSelectedStock, navigation]
+  );
+
+  const handleTogglePillMode = useCallback(() => {
+    setPillMode((prev) => (prev === 'dollar' ? 'percent' : 'dollar'));
+  }, []);
 
   const cashBalance = profile?.balance ? parseFloat(profile.balance) : 0;
 
@@ -169,6 +183,20 @@ export const PortfolioScreen: React.FC = () => {
     [holdings]
   );
 
+  const renderHoldingItem = useCallback(
+    ({ item }: { item: Holding }) => (
+      <HoldingCard
+        holding={item}
+        onTrade={() => handleTrade(item)}
+        pillDisplayMode={pillMode}
+        onTogglePillMode={handleTogglePillMode}
+      />
+    ),
+    [handleTrade, pillMode, handleTogglePillMode]
+  );
+
+  const keyExtractorHolding = useCallback((item: Holding) => item._id, []);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" />
@@ -217,17 +245,15 @@ export const PortfolioScreen: React.FC = () => {
       ) : (
         <FlatList
           data={processedHoldings}
-          keyExtractor={(item) => item._id}
-          renderItem={({ item }) => (
-            <HoldingCard
-              holding={item}
-              onTrade={() => handleTrade(item)}
-              pillDisplayMode={pillMode}
-              onTogglePillMode={() => setPillMode((prev) => (prev === 'dollar' ? 'percent' : 'dollar'))}
-            />
-          )}
+          keyExtractor={keyExtractorHolding}
+          renderItem={renderHoldingItem}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          initialNumToRender={8}
+          updateCellsBatchingPeriod={50}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}

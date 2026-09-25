@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { StockState } from './stockStore.types';
+import { Stock } from '../../services/stock/stock.types';
 import { stockApi } from '../../services/stock/stock.api';
 import { useAuthStore } from '../auth/authStore';
 import { socketService } from '../../services/socket/socket.service';
@@ -13,6 +14,67 @@ const extractErrorMessage = (error: unknown): string => {
     if (err.message) return err.message;
   }
   return 'An unexpected error occurred. Please try again.';
+};
+
+// Batch queue for high-frequency live stock ticks to prevent JS thread jank
+const pendingStockUpdates = new Map<string, Partial<Stock>>();
+let batchTimer: ReturnType<typeof setTimeout> | null = null;
+
+const flushBatchUpdates = (set: any, get: any) => {
+  if (pendingStockUpdates.size === 0) {
+    batchTimer = null;
+    return;
+  }
+
+  const updates = new Map(pendingStockUpdates);
+  pendingStockUpdates.clear();
+  batchTimer = null;
+
+  const currentStocks = get().stocks;
+  const currentSelected = get().selectedStock;
+  const currentHoldings = get().holdings;
+
+  let stocksChanged = false;
+  const updatedStocks = currentStocks.map((s: Stock) => {
+    const update = updates.get(s.symbol.toUpperCase());
+    if (update) {
+      stocksChanged = true;
+      return { ...s, ...update };
+    }
+    return s;
+  });
+
+  let nextSelected = currentSelected;
+  if (currentSelected) {
+    const selectedUpdate = updates.get(currentSelected.symbol.toUpperCase());
+    if (selectedUpdate) {
+      nextSelected = { ...currentSelected, ...selectedUpdate };
+    }
+  }
+
+  let holdingsChanged = false;
+  const updatedHoldings = currentHoldings.map((h: any) => {
+    if (h.stock && h.stock.symbol) {
+      const update = updates.get(h.stock.symbol.toUpperCase());
+      if (update) {
+        holdingsChanged = true;
+        return {
+          ...h,
+          stock: { ...h.stock, ...update },
+        };
+      }
+    }
+    return h;
+  });
+
+  if (stocksChanged || holdingsChanged || nextSelected !== currentSelected) {
+    set({
+      stocks: stocksChanged ? updatedStocks : currentStocks,
+      selectedStock: nextSelected,
+      holdings: holdingsChanged ? updatedHoldings : currentHoldings,
+      marketStatus: socketService.getMarketStatus(),
+    });
+  }
 };
 
 export const useStockStore = create<StockState>((set, get) => ({
@@ -31,40 +93,24 @@ export const useStockStore = create<StockState>((set, get) => ({
 
   setSelectedStock: (stock) => set({ selectedStock: stock }),
 
-  updateLiveStock: (updatedStock) => {
+  updateLiveStock: (updatedStock, immediate = false) => {
     if (!updatedStock || !updatedStock.symbol) return;
-    const currentStocks = get().stocks;
-    const currentSelected = get().selectedStock;
-    const currentHoldings = get().holdings;
+    pendingStockUpdates.set(updatedStock.symbol.toUpperCase(), updatedStock);
 
-    // Update in stocks array
-    const updatedStocks = currentStocks.map((s) =>
-      s.symbol === updatedStock.symbol ? { ...s, ...updatedStock } : s
-    );
-
-    // Update selectedStock if active
-    let nextSelected = currentSelected;
-    if (currentSelected && currentSelected.symbol === updatedStock.symbol) {
-      nextSelected = { ...currentSelected, ...updatedStock };
+    if (immediate) {
+      if (batchTimer) {
+        clearTimeout(batchTimer);
+        batchTimer = null;
+      }
+      flushBatchUpdates(set, get);
+      return;
     }
 
-    // Update in holdings if present
-    const updatedHoldings = currentHoldings.map((h) => {
-      if (h.stock && h.stock.symbol === updatedStock.symbol) {
-        return {
-          ...h,
-          stock: { ...h.stock, ...updatedStock },
-        };
-      }
-      return h;
-    });
-
-    set({
-      stocks: updatedStocks,
-      selectedStock: nextSelected,
-      holdings: updatedHoldings,
-      marketStatus: socketService.getMarketStatus(),
-    });
+    if (!batchTimer) {
+      batchTimer = setTimeout(() => {
+        flushBatchUpdates(set, get);
+      }, 80);
+    }
   },
 
   initSocket: () => {
@@ -77,7 +123,7 @@ export const useStockStore = create<StockState>((set, get) => ({
     socketService.connect();
     get().fetchMarketStatus();
     socketService.onStockUpdate((stock) => {
-      get().updateLiveStock(stock);
+      get().updateLiveStock(stock, false);
     });
     socketService.onMarketStatus((status) => {
       set({ marketStatus: status });

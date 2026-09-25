@@ -8,9 +8,11 @@ import { RootNavigator } from './src/navigation/RootNavigator';
 import { Colors } from './src/theme/colors';
 import { StorageProvider } from './src/services/storage/StorageProvider';
 import { notificationService } from './src/services/notification/notificationService';
+import { googleAuthService } from './src/services/auth/googleAuth.service';
 
 function App() {
   useEffect(() => {
+    googleAuthService.configure();
     const unsubscribe = notificationService.initializeListeners();
     return () => {
       unsubscribe?.();

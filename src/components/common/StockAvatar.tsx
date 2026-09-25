@@ -14,21 +14,25 @@ interface StockAvatarProps {
   fallbackText?: string;
 }
 
-export const StockAvatar: React.FC<StockAvatarProps> = ({
+const StockAvatarComponent: React.FC<StockAvatarProps> = ({
   symbol = 'STOCK',
   iconUrl,
-  size = scale(44),
-  borderRadius = scale(14),
+  size = scale(40),
+  borderRadius = scale(12),
   style,
   imageStyle,
   showBorder = true,
   fallbackText,
 }) => {
   const [imageError, setImageError] = useState(false);
-  const logoUri = getStockLogoUrl(symbol, iconUrl);
-  const brand = getStockBrand(symbol);
 
-  const displayMonogram = fallbackText || symbol.slice(0, 3).toUpperCase();
+  const logoUri = React.useMemo(() => getStockLogoUrl(symbol, iconUrl), [symbol, iconUrl]);
+  const brand = React.useMemo(() => getStockBrand(symbol), [symbol]);
+
+  const displayMonogram = React.useMemo(
+    () => fallbackText || symbol.slice(0, 3).toUpperCase(),
+    [fallbackText, symbol]
+  );
   const iconSize = Math.round(size * 0.68);
   const iconRadius = Math.max(4, Math.round(borderRadius * 0.6));
 
@@ -102,6 +106,8 @@ export const StockAvatar: React.FC<StockAvatarProps> = ({
     </View>
   );
 };
+
+export const StockAvatar = React.memo<StockAvatarProps>(StockAvatarComponent);
 
 const styles = StyleSheet.create({
   container: {

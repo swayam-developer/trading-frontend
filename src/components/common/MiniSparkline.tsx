@@ -13,19 +13,16 @@ interface MiniSparklineProps {
   showGradient?: boolean;
 }
 
-export const MiniSparkline: React.FC<MiniSparklineProps> = ({
+const MiniSparklineComponent: React.FC<MiniSparklineProps> = ({
   data,
-  width = scale(64),
-  height = verticalScale(26),
+  width = scale(50),
+  height = verticalScale(24),
   isPositive = true,
-  strokeWidth = 1.8,
+  strokeWidth = 1.6,
   showGradient = true,
 }) => {
   const strokeColor = isPositive ? Colors.primary : Colors.error;
-  const gradId = useMemo(
-    () => `spark_${Math.random().toString(36).substring(2, 8)}`,
-    []
-  );
+  const gradId = isPositive ? 'sparkGrad_pos' : 'sparkGrad_neg';
 
   // Generate synthetic points if data is empty or < 2 items
   const points = useMemo(() => {
@@ -54,8 +51,8 @@ export const MiniSparkline: React.FC<MiniSparklineProps> = ({
     const max = Math.max(...points);
     const range = max - min || 1;
 
-    const padTop = 3;
-    const padBottom = 3;
+    const padTop = 2.5;
+    const padBottom = 2.5;
     const availableHeight = height - padTop - padBottom;
 
     const coords = points.map((val, idx) => {
@@ -118,6 +115,20 @@ export const MiniSparkline: React.FC<MiniSparklineProps> = ({
     </View>
   );
 };
+
+export const MiniSparkline = React.memo<MiniSparklineProps>(
+  MiniSparklineComponent,
+  (prev, next) => {
+    return (
+      prev.isPositive === next.isPositive &&
+      prev.width === next.width &&
+      prev.height === next.height &&
+      prev.strokeWidth === next.strokeWidth &&
+      prev.showGradient === next.showGradient &&
+      prev.data === next.data
+    );
+  }
+);
 
 const styles = StyleSheet.create({
   container: {

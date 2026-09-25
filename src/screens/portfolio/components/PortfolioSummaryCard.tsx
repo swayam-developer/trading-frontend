@@ -14,7 +14,7 @@ interface PortfolioSummaryCardProps {
   onOrdersPress?: () => void;
 }
 
-export const PortfolioSummaryCard: React.FC<PortfolioSummaryCardProps> = ({
+const PortfolioSummaryCardComponent: React.FC<PortfolioSummaryCardProps> = ({
   totalCurrentValue,
   totalInvested,
   cashBalance,
@@ -152,6 +152,8 @@ export const PortfolioSummaryCard: React.FC<PortfolioSummaryCardProps> = ({
     </View>
   );
 };
+
+export const PortfolioSummaryCard = React.memo<PortfolioSummaryCardProps>(PortfolioSummaryCardComponent);
 
 const styles = StyleSheet.create({
   container: {

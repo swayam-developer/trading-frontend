@@ -12,7 +12,16 @@
           "package_name": "com.tradingfrontend"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "511218824118-otm0qcd315b3a6823s5m3kpkbfka0pgu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.tradingfrontend",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDD-jc_xxnALoKUZ52wuMEp25SDn3Pobu0"

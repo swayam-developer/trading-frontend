@@ -34,14 +34,14 @@ const FINANCE_SYMBOLS = ['JPM', 'V', 'WMT', 'PG', 'HD', 'DIS', 'JNJ'];
 export const WatchlistScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<RootNavigationProp<'MainTabs'>>();
-  const {
-    stocks,
-    isLoadingStocks,
-    fetchStocks,
-    setSelectedStock,
-    initSocket,
-    marketStatus,
-  } = useStockStore();
+
+  // Fine-grained selectors to avoid re-renders when unrelated store data changes
+  const stocks = useStockStore((s) => s.stocks);
+  const isLoadingStocks = useStockStore((s) => s.isLoadingStocks);
+  const fetchStocks = useStockStore((s) => s.fetchStocks);
+  const setSelectedStock = useStockStore((s) => s.setSelectedStock);
+  const initSocket = useStockStore((s) => s.initSocket);
+  const marketStatus = useStockStore((s) => s.marketStatus);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -78,10 +78,17 @@ export const WatchlistScreen: React.FC = () => {
     setIsRefreshing(false);
   }, [fetchStocks]);
 
-  const handleStockPress = (stock: Stock) => {
-    setSelectedStock(stock);
-    navigation.navigate('StockDetail', { stock });
-  };
+  const handleStockPress = useCallback(
+    (stock: Stock) => {
+      setSelectedStock(stock);
+      navigation.navigate('StockDetail', { stock });
+    },
+    [setSelectedStock, navigation]
+  );
+
+  const handleTogglePillMode = useCallback(() => {
+    setPillMode((prev) => (prev === 'percent' ? 'dollar' : 'percent'));
+  }, []);
 
   // Filter and sort stocks
   const processedStocks = useMemo(() => {
@@ -129,6 +136,20 @@ export const WatchlistScreen: React.FC = () => {
 
   const isLive = !!marketStatus?.isOpen;
   const statusLabel = isLive ? 'NYSE OPEN' : 'CLOSED';
+
+  const renderStockItem = useCallback(
+    ({ item }: { item: Stock }) => (
+      <StockCard
+        stock={item}
+        onPress={() => handleStockPress(item)}
+        pillDisplayMode={pillMode}
+        onTogglePillMode={handleTogglePillMode}
+      />
+    ),
+    [handleStockPress, pillMode, handleTogglePillMode]
+  );
+
+  const keyExtractorStock = useCallback((item: Stock) => item._id || item.symbol, []);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -323,17 +344,15 @@ export const WatchlistScreen: React.FC = () => {
       ) : (
         <FlatList
           data={processedStocks}
-          keyExtractor={(item) => item._id || item.symbol}
-          renderItem={({ item }) => (
-            <StockCard
-              stock={item}
-              onPress={() => handleStockPress(item)}
-              pillDisplayMode={pillMode}
-              onTogglePillMode={() => setPillMode((prev) => (prev === 'percent' ? 'dollar' : 'percent'))}
-            />
-          )}
+          keyExtractor={keyExtractorStock}
+          renderItem={renderStockItem}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          initialNumToRender={8}
+          updateCellsBatchingPeriod={50}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}

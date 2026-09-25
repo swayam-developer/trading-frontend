@@ -13,19 +13,22 @@ import { useNavigation } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { ActivityIndicator } from 'react-native';
 import { RootNavigationProp } from '../../../navigation/types';
 import { Colors } from '../../../theme/colors';
 import { AuraLogo } from '../../../components/common/AuraLogo';
 import { AuraInput } from '../../../components/common/AuraInput';
 import { AuraButton } from '../../../components/common/AuraButton';
 import { useAuthStore } from '../../../store/auth/authStore';
+import { googleAuthService } from '../../../services/auth/googleAuth.service';
 
 export const EmailCheckScreen: React.FC = () => {
   const navigation = useNavigation<RootNavigationProp<'EmailCheck'>>();
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
-  const { checkEmail, isLoading } = useAuthStore();
+  const { checkEmail, oauthLogin, isLoading } = useAuthStore();
 
   const isEmailValidFormat = (val: string): boolean => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -79,6 +82,50 @@ export const EmailCheckScreen: React.FC = () => {
         text1: 'Email Verification Failed',
         text2: err.message || 'Unable to check email.',
       });
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    try {
+      const authResult = await googleAuthService.signIn();
+      if (!authResult) {
+        // User dismissed the Google sign-in dialog
+        setIsGoogleLoading(false);
+        return;
+      }
+
+      await oauthLogin('google', authResult.idToken);
+
+      const store = useAuthStore.getState();
+      const userName = store.user?.name || authResult.user.name || 'Trader';
+
+      Toast.show({
+        type: 'success',
+        text1: 'Welcome Back',
+        text2: `Signed in as ${userName}`,
+      });
+
+      const hasSecuritySet =
+        store.hasPin ||
+        store.hasBiometric ||
+        !!store.profile?.login_pin_exist ||
+        !!store.profile?.biometric_exist ||
+        !!store.user?.login_pin_exist;
+
+      if (hasSecuritySet) {
+        navigation.replace('VerifyPin');
+      } else {
+        navigation.replace('SetPin');
+      }
+    } catch (err: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Google Sign-In Failed',
+        text2: err.message || 'Unable to sign in with Google.',
+      });
+    } finally {
+      setIsGoogleLoading(false);
     }
   };
 
@@ -161,19 +208,20 @@ export const EmailCheckScreen: React.FC = () => {
 
           <TouchableOpacity
             style={styles.googleButton}
-            onPress={() => {
-              Toast.show({
-                type: 'info',
-                text1: 'Google Sign-In',
-                text2: 'One-tap Google SSO is enabled for live deployment.',
-              });
-            }}
+            onPress={handleGoogleSignIn}
+            disabled={isLoading || isGoogleLoading}
             activeOpacity={0.75}
           >
-            <View style={styles.googleIconCircle}>
-              <Icon name="logo-google" size={moderateScale(16)} color="#FFFFFF" />
-            </View>
-            <Text style={styles.googleButtonText}>Continue with Google</Text>
+            {isGoogleLoading ? (
+              <ActivityIndicator color={Colors.primary} size="small" />
+            ) : (
+              <>
+                <View style={styles.googleIconCircle}>
+                  <Icon name="logo-google" size={moderateScale(16)} color="#FFFFFF" />
+                </View>
+                <Text style={styles.googleButtonText}>Continue with Google</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
 

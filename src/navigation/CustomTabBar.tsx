@@ -23,7 +23,7 @@ const TAB_ICONS: Record<string, { active: string; inactive: string }> = {
   Profile: { active: 'person', inactive: 'person-outline' },
 };
 
-export const CustomTabBar: React.FC<BottomTabBarProps> = ({
+const CustomTabBarComponent: React.FC<BottomTabBarProps> = ({
   state,
   descriptors,
   navigation,
@@ -128,6 +128,8 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
     </View>
   );
 };
+
+export const CustomTabBar = React.memo<BottomTabBarProps>(CustomTabBarComponent);
 
 const styles = StyleSheet.create({
   wrapper: {

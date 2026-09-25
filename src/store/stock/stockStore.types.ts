@@ -21,7 +21,7 @@ export interface StockState {
   fetchHoldings: () => Promise<Holding[]>;
   fetchOrders: () => Promise<Order[]>;
   setSelectedStock: (stock: Stock | null) => void;
-  updateLiveStock: (stock: Stock) => void;
+  updateLiveStock: (stock: Stock, immediate?: boolean) => void;
   initSocket: () => void;
   buyStock: (stockId: string, quantity: number) => Promise<void>;
   sellStock: (holdingId: string, quantity: number) => Promise<void>;

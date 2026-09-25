@@ -29,7 +29,12 @@ type OrderFilter = 'all' | 'executed' | 'pending_amo' | 'buy' | 'sell';
 export const OrdersScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<MainTabNavigationProp<'Orders'>>();
-  const { orders, isLoadingOrders, error, fetchOrders } = useStockStore();
+
+  // Fine-grained selectors
+  const orders = useStockStore((s) => s.orders);
+  const isLoadingOrders = useStockStore((s) => s.isLoadingOrders);
+  const error = useStockStore((s) => s.error);
+  const fetchOrders = useStockStore((s) => s.fetchOrders);
 
   const [filter, setFilter] = useState<OrderFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -103,6 +108,19 @@ export const OrdersScreen: React.FC = () => {
       totalVolume: volume,
     };
   }, [orders]);
+
+  const handleOrderPress = useCallback((order: Order) => {
+    setSelectedOrder(order);
+  }, []);
+
+  const renderOrderItem = useCallback(
+    ({ item }: { item: Order }) => (
+      <OrderCard order={item} onPress={() => handleOrderPress(item)} />
+    ),
+    [handleOrderPress]
+  );
+
+  const keyExtractorOrder = useCallback((item: Order) => item._id, []);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -252,12 +270,15 @@ export const OrdersScreen: React.FC = () => {
       ) : (
         <FlatList
           data={filteredOrders}
-          keyExtractor={(item) => item._id}
-          renderItem={({ item }) => (
-            <OrderCard order={item} onPress={() => setSelectedOrder(item)} />
-          )}
+          keyExtractor={keyExtractorOrder}
+          renderItem={renderOrderItem}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          initialNumToRender={8}
+          updateCellsBatchingPeriod={50}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
