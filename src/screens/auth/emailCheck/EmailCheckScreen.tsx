@@ -19,6 +19,7 @@ import { Colors } from '../../../theme/colors';
 import { AuraLogo } from '../../../components/common/AuraLogo';
 import { AuraInput } from '../../../components/common/AuraInput';
 import { AuraButton } from '../../../components/common/AuraButton';
+import { GoogleLogoIcon } from '../../../components/common/GoogleLogoIcon';
 import { useAuthStore } from '../../../store/auth/authStore';
 import { googleAuthService } from '../../../services/auth/googleAuth.service';
 
@@ -210,14 +211,14 @@ export const EmailCheckScreen: React.FC = () => {
             style={styles.googleButton}
             onPress={handleGoogleSignIn}
             disabled={isLoading || isGoogleLoading}
-            activeOpacity={0.75}
+            activeOpacity={0.8}
           >
             {isGoogleLoading ? (
               <ActivityIndicator color={Colors.primary} size="small" />
             ) : (
               <>
-                <View style={styles.googleIconCircle}>
-                  <Icon name="logo-google" size={moderateScale(16)} color="#FFFFFF" />
+                <View style={styles.googleIconWrapper}>
+                  <GoogleLogoIcon size={moderateScale(18)} />
                 </View>
                 <Text style={styles.googleButtonText}>Continue with Google</Text>
               </>
@@ -362,25 +363,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: verticalScale(48),
-    backgroundColor: Colors.inputBackground,
-    borderRadius: moderateScale(12),
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    height: verticalScale(50),
+    backgroundColor: '#1C2029',
+    borderRadius: moderateScale(14),
+    borderWidth: 1.2,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  googleIconCircle: {
-    width: scale(26),
-    height: scale(26),
-    borderRadius: scale(13),
-    backgroundColor: '#EA4335',
+  googleIconWrapper: {
+    width: scale(30),
+    height: scale(30),
+    borderRadius: scale(15),
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: scale(10),
+    marginRight: scale(12),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
   },
   googleButtonText: {
-    color: Colors.textPrimary,
-    fontSize: moderateScale(14),
+    color: '#FFFFFF',
+    fontSize: moderateScale(14.5),
     fontWeight: '600',
+    letterSpacing: 0.2,
   },
   trustBadgesRow: {
     flexDirection: 'row',
